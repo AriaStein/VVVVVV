@@ -1,8 +1,12 @@
 #include <SDL.h>
-#include <stdio.h>
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>
+#include <emscripten/html5.h>
+#endif
 
+#include "CustomLevels.h"
 #include "DeferCallbacks.h"
-#include "editor.h"
+#include "Editor.h"
 #include "Enums.h"
 #include "Entity.h"
 #include "Exit.h"
@@ -20,19 +24,17 @@
 #include "RenderFixed.h"
 #include "Screen.h"
 #include "Script.h"
-#include "SoundSystem.h"
 #include "UtilityClass.h"
-
-#ifdef __EMSCRIPTEN__
-#include <emscripten.h>
-#include <emscripten/html5.h>
-#endif
+#include "Vlogging.h"
 
 scriptclass script;
 
-#if !defined(NO_CUSTOM_LEVELS)
-std::vector<edentities> edentity;
+#ifndef NO_CUSTOM_LEVELS
+std::vector<CustomEntity> customentities;
+customlevelclass cl;
+# ifndef NO_EDITOR
 editorclass ed;
+# endif
 #endif
 
 UtilityClass help;
@@ -56,13 +58,13 @@ static std::string playassets;
 
 static std::string playtestname;
 
-static volatile Uint32 time_ = 0;
-static volatile Uint32 timePrev = 0;
+static volatile Uint64 time_ = 0;
+static volatile Uint64 timePrev = 0;
 static volatile Uint32 accumulator = 0;
 
 #ifndef __EMSCRIPTEN__
-static volatile Uint32 f_time = 0;
-static volatile Uint32 f_timePrev = 0;
+static volatile Uint64 f_time = 0;
+static volatile Uint64 f_timePrev = 0;
 #endif
 
 enum FuncType
@@ -151,7 +153,7 @@ static const inline struct ImplFunc* get_gamestate_funcs(
     FUNC_LIST_END
 
     FUNC_LIST_BEGIN(TELEPORTERMODE)
-        {Func_fixed, maprenderfixed},
+        {Func_fixed, teleporterrenderfixed},
         {Func_delta, teleporterrender},
         {Func_input, teleportermodeinput},
         {Func_fixed, maplogic},
@@ -235,6 +237,10 @@ static void unfocused_run(void);
 static const struct ImplFunc unfocused_func_list[] = {
     {
         Func_input, /* we still need polling when unfocused */
+        NULL
+    },
+    {
+        Func_delta,
         unfocused_run
     }
 };
@@ -348,10 +354,10 @@ static void inline deltaloop(void);
 static void cleanup(void);
 
 #ifdef __EMSCRIPTEN__
-void emscriptenloop(void)
+static void emscriptenloop(void)
 {
     timePrev = time_;
-    time_ = SDL_GetTicks();
+    time_ = SDL_GetTicks64();
     deltaloop();
 }
 #endif
@@ -360,6 +366,8 @@ int main(int argc, char *argv[])
 {
     char* baseDir = NULL;
     char* assetsPath = NULL;
+
+    vlog_init();
 
     for (int i = 1; i < argc; ++i)
     {
@@ -371,7 +379,7 @@ int main(int argc, char *argv[])
     } \
     else \
     { \
-        printf("%s option requires one argument.\n", argv[i]); \
+        vlog_error("%s option requires one argument.", argv[i]); \
         VVV_exit(1); \
     }
 
@@ -430,18 +438,46 @@ int main(int argc, char *argv[])
                 playassets = "levels/" + std::string(argv[i]) + ".vvvvvv";
             })
         }
+        else if (ARG("-nooutput"))
+        {
+            vlog_toggle_output(0);
+        }
+        else if (ARG("-forcecolor") || ARG("-forcecolour"))
+        {
+            vlog_toggle_color(1);
+        }
+        else if (ARG("-nocolor") || ARG("-nocolour"))
+        {
+            vlog_toggle_color(0);
+        }
+        else if (ARG("-debug"))
+        {
+            vlog_toggle_debug(1);
+        }
+        else if (ARG("-noinfo"))
+        {
+            vlog_toggle_info(0);
+        }
+        else if (ARG("-nowarn"))
+        {
+            vlog_toggle_warn(0);
+        }
+        else if (ARG("-noerror"))
+        {
+            vlog_toggle_error(0);
+        }
 #undef ARG_INNER
 #undef ARG
         else
         {
-            printf("Error: invalid option: %s\n", argv[i]);
+            vlog_error("Error: invalid option: %s", argv[i]);
             VVV_exit(1);
         }
     }
 
     if(!FILESYSTEM_init(argv[0], baseDir, assetsPath))
     {
-        puts("Unable to initialize filesystem!");
+        vlog_error("Unable to initialize filesystem!");
         VVV_exit(1);
     }
 
@@ -458,34 +494,34 @@ int main(int argc, char *argv[])
 
     NETWORK_init();
 
-    printf("\t\t\n");
-    printf("\t\t\n");
-    printf("\t\t       VVVVVV\n");
-    printf("\t\t\n");
-    printf("\t\t\n");
-    printf("\t\t  8888888888888888  \n");
-    printf("\t\t88888888888888888888\n");
-    printf("\t\t888888    8888    88\n");
-    printf("\t\t888888    8888    88\n");
-    printf("\t\t88888888888888888888\n");
-    printf("\t\t88888888888888888888\n");
-    printf("\t\t888888            88\n");
-    printf("\t\t88888888        8888\n");
-    printf("\t\t  8888888888888888  \n");
-    printf("\t\t      88888888      \n");
-    printf("\t\t  8888888888888888  \n");
-    printf("\t\t88888888888888888888\n");
-    printf("\t\t88888888888888888888\n");
-    printf("\t\t88888888888888888888\n");
-    printf("\t\t8888  88888888  8888\n");
-    printf("\t\t8888  88888888  8888\n");
-    printf("\t\t    888888888888    \n");
-    printf("\t\t    8888    8888    \n");
-    printf("\t\t  888888    888888  \n");
-    printf("\t\t  888888    888888  \n");
-    printf("\t\t  888888    888888  \n");
-    printf("\t\t\n");
-    printf("\t\t\n");
+    vlog_info("\t\t");
+    vlog_info("\t\t");
+    vlog_info("\t\t       VVVVVV");
+    vlog_info("\t\t");
+    vlog_info("\t\t");
+    vlog_info("\t\t  8888888888888888  ");
+    vlog_info("\t\t88888888888888888888");
+    vlog_info("\t\t888888    8888    88");
+    vlog_info("\t\t888888    8888    88");
+    vlog_info("\t\t88888888888888888888");
+    vlog_info("\t\t88888888888888888888");
+    vlog_info("\t\t888888            88");
+    vlog_info("\t\t88888888        8888");
+    vlog_info("\t\t  8888888888888888  ");
+    vlog_info("\t\t      88888888      ");
+    vlog_info("\t\t  8888888888888888  ");
+    vlog_info("\t\t88888888888888888888");
+    vlog_info("\t\t88888888888888888888");
+    vlog_info("\t\t88888888888888888888");
+    vlog_info("\t\t8888  88888888  8888");
+    vlog_info("\t\t8888  88888888  8888");
+    vlog_info("\t\t    888888888888    ");
+    vlog_info("\t\t    8888    8888    ");
+    vlog_info("\t\t  888888    888888  ");
+    vlog_info("\t\t  888888    888888  ");
+    vlog_info("\t\t  888888    888888  ");
+    vlog_info("\t\t");
+    vlog_info("\t\t");
 
     //Set up screen
 
@@ -530,12 +566,13 @@ int main(int argc, char *argv[])
     {
         // Prioritize unlock.vvv first (2.2 and below),
         // but settings have been migrated to settings.vvv (2.3 and up)
-        ScreenSettings screen_settings;
+        struct ScreenSettings screen_settings;
+        SDL_zero(screen_settings);
+        ScreenSettings_default(&screen_settings);
         game.loadstats(&screen_settings);
         game.loadsettings(&screen_settings);
-        gameScreen.init(screen_settings);
+        gameScreen.init(&screen_settings);
     }
-    graphics.screenbuffer = &gameScreen;
 
     graphics.create_buffers(gameScreen.GetFormat());
 
@@ -589,23 +626,23 @@ int main(int argc, char *argv[])
         game.menustart = true;
 
         LevelMetaData meta;
-        if (ed.getLevelMetaData(playtestname, meta)) {
-            ed.ListOfMetaData.clear();
-            ed.ListOfMetaData.push_back(meta);
+        if (cl.getLevelMetaData(playtestname, meta)) {
+            cl.ListOfMetaData.clear();
+            cl.ListOfMetaData.push_back(meta);
         } else {
-            ed.loadZips();
-            if (ed.getLevelMetaData(playtestname, meta)) {
-                ed.ListOfMetaData.clear();
-                ed.ListOfMetaData.push_back(meta);
+            cl.loadZips();
+            if (cl.getLevelMetaData(playtestname, meta)) {
+                cl.ListOfMetaData.clear();
+                cl.ListOfMetaData.push_back(meta);
             } else {
-                printf("Level not found\n");
+                vlog_error("Level not found");
                 VVV_exit(1);
             }
         }
 
         game.loadcustomlevelstats();
-        game.customleveltitle=ed.ListOfMetaData[game.playcustomlevel].title;
-        game.customlevelfilename=ed.ListOfMetaData[game.playcustomlevel].filename;
+        game.customleveltitle=cl.ListOfMetaData[game.playcustomlevel].title;
+        game.customlevelfilename=cl.ListOfMetaData[game.playcustomlevel].filename;
         if (savefileplaytest) {
             game.playx = savex;
             game.playy = savey;
@@ -633,20 +670,20 @@ int main(int argc, char *argv[])
 #else
     while (true)
     {
-        f_time = SDL_GetTicks();
+        f_time = SDL_GetTicks64();
 
-        const Uint32 f_timetaken = f_time - f_timePrev;
+        const Uint64 f_timetaken = f_time - f_timePrev;
         if (!game.over30mode && f_timetaken < 34)
         {
-            const volatile Uint32 f_delay = 34 - f_timetaken;
-            SDL_Delay(f_delay);
-            f_time = SDL_GetTicks();
+            const volatile Uint64 f_delay = 34 - f_timetaken;
+            SDL_Delay((Uint32) f_delay);
+            f_time = SDL_GetTicks64();
         }
 
         f_timePrev = f_time;
 
         timePrev = time_;
-        time_ = SDL_GetTicks();
+        time_ = SDL_GetTicks64();
 
         deltaloop();
     }
@@ -671,7 +708,7 @@ static void cleanup(void)
     FILESYSTEM_deinit();
 }
 
-void VVV_exit(const int exit_code)
+SDL_NORETURN void VVV_exit(const int exit_code)
 {
     cleanup();
     exit(exit_code);
@@ -720,7 +757,7 @@ static void inline deltaloop(void)
         {
             implfunc->func();
 
-            gameScreen.FlipScreen();
+            gameScreen.FlipScreen(graphics.flipmode);
         }
     }
 }
@@ -751,7 +788,6 @@ static void unfocused_run(void)
 #undef FLIP
     }
     graphics.render();
-    gameScreen.FlipScreen();
     //We are minimised, so lets put a bit of a delay to save CPU
 #ifndef __EMSCRIPTEN__
     SDL_Delay(100);
@@ -803,24 +839,7 @@ static enum LoopCode loop_end(void)
         game.musicmutebutton--;
     }
 
-    if (game.muted)
-    {
-        Mix_VolumeMusic(0) ;
-        Mix_Volume(-1,0);
-    }
-    else
-    {
-        Mix_Volume(-1,MIX_MAX_VOLUME * music.user_sound_volume / USER_VOLUME_MAX);
-
-        if (game.musicmuted)
-        {
-            Mix_VolumeMusic(0);
-        }
-        else
-        {
-            Mix_VolumeMusic(music.musicVolume * music.user_music_volume / USER_VOLUME_MAX);
-        }
-    }
+    music.updatemutestate();
 
     if (key.resetWindow)
     {

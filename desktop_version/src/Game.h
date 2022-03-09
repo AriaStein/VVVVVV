@@ -7,6 +7,13 @@
 
 #include "ScreenSettings.h"
 
+/* FIXME: Can't forward declare this enum in C++, unfortunately.
+ * In C, enum sizes are always the same, so you can forward declare them.
+ * In C++ instead, enum sizes are based on how many enums there are.
+ * You cannot specify the underlying type until C++11.
+ * But bumping the standard opens up a can of worms. I'd rather just move to C. -Misa */
+#include "Enums.h"
+
 // Forward decl without including all of <tinyxml2.h>
 namespace tinyxml2
 {
@@ -30,6 +37,8 @@ namespace Menu
     {
         mainmenu,
         playerworlds,
+        confirmshowlevelspath,
+        showlevelspath,
         levellist,
         quickloadlevel,
         deletequicklevel,
@@ -121,7 +130,7 @@ public:
 
     void resetgameclock(void);
 
-    bool customsavequick(std::string savfile);
+    bool customsavequick(const std::string& savfile);
     bool savequick(void);
 
     void gameclock(void);
@@ -130,11 +139,11 @@ public:
 
     std::string  timestring(void);
 
-    std::string partimestring(void);
-
     std::string resulttimestring(void);
 
     std::string timetstring(int t);
+
+    void timestringcenti(char* buffer, size_t buffer_size);
 
     void returnmenu(void);
     void returntomenu(enum Menu::MenuName t);
@@ -154,20 +163,20 @@ public:
 
     void unlocknum(int t);
 
-    void loadstats(ScreenSettings* screen_settings);
+    void loadstats(struct ScreenSettings* screen_settings);
 
-    bool savestats(const ScreenSettings* screen_settings);
-    bool savestats(void);
+    bool savestats(const struct ScreenSettings* screen_settings, bool sync = true);
+    bool savestats(bool sync = true);
 
     void deletestats(void);
 
-    void deserializesettings(tinyxml2::XMLElement* dataNode, ScreenSettings* screen_settings);
+    void deserializesettings(tinyxml2::XMLElement* dataNode, struct ScreenSettings* screen_settings);
 
-    void serializesettings(tinyxml2::XMLElement* dataNode, const ScreenSettings* screen_settings);
+    void serializesettings(tinyxml2::XMLElement* dataNode, const struct ScreenSettings* screen_settings);
 
-    void loadsettings(ScreenSettings* screen_settings);
+    void loadsettings(struct ScreenSettings* screen_settings);
 
-    bool savesettings(const ScreenSettings* screen_settings);
+    bool savesettings(const struct ScreenSettings* screen_settings);
     bool savesettings(void);
 
     bool savestatsandsettings(void);
@@ -196,14 +205,14 @@ public:
 
     void deathsequence(void);
 
-    void customloadquick(std::string savfile);
+    void customloadquick(const std::string& savfile);
     void loadquick(void);
 
     void customdeletequick(const std::string& file);
 
     void loadsummary(void);
 
-    void readmaingamesave(tinyxml2::XMLDocument& doc);
+    void readmaingamesave(const char* savename, tinyxml2::XMLDocument& doc);
     std::string writemaingamesave(tinyxml2::XMLDocument& doc);
 
     void initteleportermode(void);
@@ -211,15 +220,12 @@ public:
     const char* saveFilePath;
 
 
-    int door_left;
-    int door_right;
-    int door_up;
-    int door_down;
     int roomx, roomy;
     int prevroomx, prevroomy;
 
     int savex, savey, saverx, savery;
     int savegc, savedir;
+    int savecolour;
 
     //Added for port
     int edsavex, edsavey, edsaverx, edsavery;
@@ -230,8 +236,8 @@ public:
 
     bool glitchrunkludge;
 
-    int gamestate;
-    int prevgamestate; //only used sometimes
+    enum GameGamestate gamestate;
+    enum GameGamestate prevgamestate; //only used sometimes
     bool hascontrol, jumpheld;
     int jumppressed;
     int gravitycontrol;
@@ -245,7 +251,7 @@ public:
     int tapleft, tapright;
 
     //Menu interaction stuff
-    void mapmenuchange(const int newgamestate);
+    void mapmenuchange(const enum GameGamestate newgamestate, const bool user_initiated);
     bool mapheld;
     int menupage;
     int lastsaved;
@@ -304,7 +310,7 @@ public:
     int  swnrecord, swnbestrank, swnrank, swnmessage;
 
     //SuperCrewMate Stuff
-    bool supercrewmate, scmhurt, scmmoveme;
+    bool supercrewmate, scmhurt;
     int scmprogress;
 
     //Accessibility Options
@@ -388,7 +394,7 @@ public:
     bool activetele;
     int readytotele;
     int oldreadytotele;
-    int activity_r, activity_g, activity_b;
+    int activity_r, activity_g, activity_b, activity_x, activity_y;
     std::string activity_lastprompt;
 
     std::string telesummary, quicksummary, customquicksummary;

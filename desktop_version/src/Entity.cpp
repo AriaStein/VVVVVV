@@ -3,7 +3,7 @@
 
 #include <SDL.h>
 
-#include "editor.h"
+#include "CustomLevels.h"
 #include "Game.h"
 #include "GlitchrunnerMode.h"
 #include "Graphics.h"
@@ -11,13 +11,14 @@
 #include "Music.h"
 #include "Script.h"
 #include "UtilityClass.h"
+#include "Vlogging.h"
 #include "Xoshiro.h"
 
 bool entityclass::checktowerspikes(int t)
 {
     if (!INBOUNDS_VEC(t, entities))
     {
-        puts("checktowerspikes() out-of-bounds!");
+        vlog_error("checktowerspikes() out-of-bounds!");
         return false;
     }
 
@@ -70,6 +71,8 @@ void entityclass::init(void)
     customenemy = 0;
     customwarpmode = false; customwarpmodevon = false; customwarpmodehon = false;
     customactivitycolour = "";
+    customactivitypositionx = -1;
+    customactivitypositiony = -1;
     customactivitytext = "";
     trophytext = 0;
     oldtrophytext = 0;
@@ -147,62 +150,62 @@ void entityclass::generateswnwave( int t )
                     game.swnstate = 9;
                     game.swndelay = 8;
                 }
-                else	if (game.swntimer <= 300)    //less than 10 seconds
+                else    if (game.swntimer <= 300)    //less than 10 seconds
                 {
                     game.swnstate = 6;
                     game.swndelay = 12;
                 }
-                else	if (game.swntimer <= 360)    //less than 12 seconds
+                else    if (game.swntimer <= 360)    //less than 12 seconds
                 {
                     game.swnstate = 5+game.swnstate2;
                     game.swndelay = 15;
                 }
-                else	if (game.swntimer <= 420)    //less than 14 seconds
+                else    if (game.swntimer <= 420)    //less than 14 seconds
                 {
                     game.swnstate = 7+game.swnstate2;
                     game.swndelay = 15;
                 }
-                else	if (game.swntimer <= 480)    //less than 16 seconds
+                else    if (game.swntimer <= 480)    //less than 16 seconds
                 {
                     game.swnstate = 5+game.swnstate2;
                     game.swndelay = 15;
                 }
-                else	if (game.swntimer <= 540)    //less than 18 seconds
+                else    if (game.swntimer <= 540)    //less than 18 seconds
                 {
                     game.swnstate = 7+game.swnstate2;
                     game.swndelay = 15;
                 }
-                else	if (game.swntimer <= 600)    //less than 20 seconds
+                else    if (game.swntimer <= 600)    //less than 20 seconds
                 {
                     game.swnstate = 5+game.swnstate2;
                     game.swndelay = 15;
                 }
-                else	if (game.swntimer <= 900)    //less than 30 seconds
+                else    if (game.swntimer <= 900)    //less than 30 seconds
                 {
                     game.swnstate = 4;
                     game.swndelay = 20;
                 }
-                else	if (game.swntimer <= 1050)    //less than 35 seconds
+                else    if (game.swntimer <= 1050)    //less than 35 seconds
                 {
                     game.swnstate = 3;
                     game.swndelay = 10;
                 }
-                else	if (game.swntimer <= 1200)    //less than 40 seconds
+                else    if (game.swntimer <= 1200)    //less than 40 seconds
                 {
                     game.swnstate = 3;
                     game.swndelay = 20;
                 }
-                else	if (game.swntimer <= 1500)    //less than 50 seconds
+                else    if (game.swntimer <= 1500)    //less than 50 seconds
                 {
                     game.swnstate = 2;
                     game.swndelay = 10;
                 }
-                else	if (game.swntimer <= 1650)    //less than 55 seconds
+                else    if (game.swntimer <= 1650)    //less than 55 seconds
                 {
                     game.swnstate = 1;
                     game.swndelay = 15;
                 }
-                else	if (game.swntimer <= 1800)    //less than 60 seconds
+                else    if (game.swntimer <= 1800)    //less than 60 seconds
                 {
                     game.swnstate = 1;
                     game.swndelay = 25;
@@ -1077,8 +1080,21 @@ void entityclass::createblock( int t, int xp, int yp, int w, int h, int trig /*=
 
     if (customactivitycolour != "")
     {
-        block.setblockcolour(customactivitycolour);
+        block.setblockcolour(customactivitycolour.c_str());
         customactivitycolour = "";
+    }
+
+    if (customactivitypositionx != -1)
+    {
+        block.activity_x = customactivitypositionx;
+        block.activity_y = customactivitypositiony;
+        customactivitypositionx = -1;
+        customactivitypositiony = -1;
+    }
+    else
+    {
+        block.activity_x = 0;
+        block.activity_y = 0;
     }
 
     if (!reuse)
@@ -1092,7 +1108,7 @@ bool entityclass::disableentity(int t)
 {
     if (!INBOUNDS_VEC(t, entities))
     {
-        puts("disableentity() out-of-bounds!");
+        vlog_error("disableentity() out-of-bounds!");
         return true;
     }
     if (entities[t].rule == 0 && t == getplayer())
@@ -1105,6 +1121,7 @@ bool entityclass::disableentity(int t)
     entities[t].size = -1;
     entities[t].type = -1;
     entities[t].rule = -1;
+    entities[t].isplatform = false;
 
     return true;
 }
@@ -1118,7 +1135,7 @@ void entityclass::disableblock( int t )
 {
     if (!INBOUNDS_VEC(t, blocks))
     {
-        puts("disableblock() out-of-bounds!");
+        vlog_error("disableblock() out-of-bounds!");
         return;
     }
 
@@ -1173,7 +1190,7 @@ void entityclass::copylinecross(std::vector<entclass>& linecrosskludge, int t)
 {
     if (!INBOUNDS_VEC(t, entities))
     {
-        puts("copylinecross() out-of-bounds!");
+        vlog_error("copylinecross() out-of-bounds!");
         return;
     }
     //Copy entity t into the first free linecrosskludge entity
@@ -1184,7 +1201,7 @@ void entityclass::revertlinecross(std::vector<entclass>& linecrosskludge, int t,
 {
     if (!INBOUNDS_VEC(t, entities) || !INBOUNDS_VEC(s, linecrosskludge))
     {
-        puts("revertlinecross() out-of-bounds!");
+        vlog_error("revertlinecross() out-of-bounds!");
         return;
     }
     //Restore entity t info from linecrossing s
@@ -1222,7 +1239,8 @@ void entityclass::createentity(int xp, int yp, int t, int meta1, int meta2, int 
         if (entities[i].invis
         && entities[i].size == -1
         && entities[i].type == -1
-        && entities[i].rule == -1)
+        && entities[i].rule == -1
+        && !entities[i].isplatform)
         {
             reuse = true;
             entptr = &entities[i];
@@ -1256,7 +1274,7 @@ void entityclass::createentity(int xp, int yp, int t, int meta1, int meta2, int 
 
 #if !defined(NO_CUSTOM_LEVELS)
     // Special case for gray Warp Zone tileset!
-    const edlevelclass* const room = ed.getroomprop(game.roomx - 100, game.roomy - 100);
+    const RoomProperty* const room = cl.getroomprop(game.roomx - 100, game.roomy - 100);
     bool custom_gray = room->tileset == 3 && room->tilecol == 6;
 #else
     bool custom_gray = false;
@@ -1800,21 +1818,21 @@ void entityclass::createentity(int xp, int yp, int t, int meta1, int meta2, int 
             if(game.bestrank[1]>=3)
             {
                 entity.tile = 186 + meta1;
-                entity.colour = 33;
+                entity.colour = 35;
             }
             break;
         case 3:
             if(game.bestrank[2]>=3)
             {
                 entity.tile = 184 + meta1;
-                entity.colour = 35;
+                entity.colour = 33;
             }
             break;
         case 4:
             if(game.bestrank[3]>=3)
             {
                 entity.tile = 184 + meta1;
-                entity.colour = 30;
+                entity.colour = 32;
             }
             break;
         case 5:
@@ -1828,7 +1846,7 @@ void entityclass::createentity(int xp, int yp, int t, int meta1, int meta2, int 
             if(game.bestrank[5]>=3)
             {
                 entity.tile = 184 + meta1;
-                entity.colour = 32;
+                entity.colour = 30;
             }
             break;
 
@@ -2161,7 +2179,7 @@ bool entityclass::updateentities( int i )
 {
     if (!INBOUNDS_VEC(i, entities))
     {
-        puts("updateentities() out-of-bounds!");
+        vlog_error("updateentities() out-of-bounds!");
         return true;
     }
 
@@ -2777,8 +2795,8 @@ bool entityclass::updateentities( int i )
             if (entities[i].state == 1)
             {
                 //happy!
-                if (INBOUNDS_VEC(k, entities) && entities[k].rule == 6)	entities[k].tile = 0;
-                if (INBOUNDS_VEC(k, entities) && entities[k].rule == 7)	entities[k].tile = 6;
+                if (INBOUNDS_VEC(k, entities) && entities[k].rule == 6)    entities[k].tile = 0;
+                if (INBOUNDS_VEC(k, entities) && entities[k].rule == 7)    entities[k].tile = 6;
                 //Stay close to the hero!
                 int j = getplayer();
                 if (INBOUNDS_VEC(j, entities) && entities[j].xp > entities[i].xp + 5)
@@ -3059,7 +3077,7 @@ bool entityclass::updateentities( int i )
                         entities[i].para = 30;
                     }
                 }
-                else	if (entities[i].life == 1)
+                else    if (entities[i].life == 1)
                 {
                     //Stand around for a bit
                     entities[i].para--;
@@ -3095,7 +3113,7 @@ bool entityclass::updateentities( int i )
                         entities[i].para = 30;
                     }
                 }
-                else	if (entities[i].life == 3)
+                else    if (entities[i].life == 3)
                 {
                     //Stand around for a bit
                     entities[i].para--;
@@ -3385,7 +3403,7 @@ void entityclass::animateentities( int _i )
 {
     if (!INBOUNDS_VEC(_i, entities))
     {
-        puts("animateentities() out-of-bounds!");
+        vlog_error("animateentities() out-of-bounds!");
         return;
     }
 
@@ -3687,7 +3705,7 @@ void entityclass::animateentities( int _i )
             {
                 entities[_i].drawframe ++;
                 //if (game.gravitycontrol == 1) {
-                //	entities[_i].drawframe += 6;
+                //    entities[_i].drawframe += 6;
                 //}
             }
 
@@ -3770,7 +3788,7 @@ void entityclass::animatehumanoidcollision(const int i)
 
     if (!INBOUNDS_VEC(i, entities))
     {
-        puts("animatehumanoidcollision() out-of-bounds!");
+        vlog_error("animatehumanoidcollision() out-of-bounds!");
         return;
     }
 
@@ -3972,7 +3990,7 @@ bool entityclass::entitycollide( int a, int b )
 {
     if (!INBOUNDS_VEC(a, entities) || !INBOUNDS_VEC(b, entities))
     {
-        puts("entitycollide() out-of-bounds!");
+        vlog_error("entitycollide() out-of-bounds!");
         return false;
     }
 
@@ -4073,8 +4091,7 @@ int entityclass::checkactivity(void)
 
 int entityclass::getgridpoint( int t )
 {
-    t = (t - (t % 8)) / 8;
-    return t;
+    return t / 8;
 }
 
 bool entityclass::checkplatform(const SDL_Rect& temprect, int* px, int* py)
@@ -4199,7 +4216,7 @@ bool entityclass::entityhlinecollide( int t, int l )
 {
     if (!INBOUNDS_VEC(t, entities) || !INBOUNDS_VEC(l, entities))
     {
-        puts("entityhlinecollide() out-of-bounds!");
+        vlog_error("entityhlinecollide() out-of-bounds!");
         return false;
     }
 
@@ -4226,7 +4243,7 @@ bool entityclass::entityvlinecollide( int t, int l )
 {
     if (!INBOUNDS_VEC(t, entities) || !INBOUNDS_VEC(l, entities))
     {
-        puts("entityvlinecollide() out-of-bounds!");
+        vlog_error("entityvlinecollide() out-of-bounds!");
         return false;
     }
 
@@ -4250,7 +4267,7 @@ bool entityclass::entityvlinecollide( int t, int l )
 bool entityclass::entitywarphlinecollide(int t, int l) {
     if (!INBOUNDS_VEC(t, entities) || !INBOUNDS_VEC(l, entities))
     {
-        puts("entitywarphlinecollide() out-of-bounds!");
+        vlog_error("entitywarphlinecollide() out-of-bounds!");
         return false;
     }
 
@@ -4288,7 +4305,7 @@ bool entityclass::entitywarphlinecollide(int t, int l) {
 bool entityclass::entitywarpvlinecollide(int t, int l) {
     if (!INBOUNDS_VEC(t, entities) || !INBOUNDS_VEC(l, entities))
     {
-        puts("entitywarpvlinecollide() out-of-bounds!");
+        vlog_error("entitywarpvlinecollide() out-of-bounds!");
         return false;
     }
 
@@ -4323,7 +4340,7 @@ float entityclass::entitycollideplatformroof( int t )
 {
     if (!INBOUNDS_VEC(t, entities))
     {
-        puts("entitycollideplatformroof() out-of-bounds!");
+        vlog_error("entitycollideplatformroof() out-of-bounds!");
         return -1000;
     }
 
@@ -4346,7 +4363,7 @@ float entityclass::entitycollideplatformfloor( int t )
 {
     if (!INBOUNDS_VEC(t, entities))
     {
-        puts("entitycollideplatformfloor() out-of-bounds!");
+        vlog_error("entitycollideplatformfloor() out-of-bounds!");
         return -1000;
     }
 
@@ -4369,7 +4386,7 @@ bool entityclass::entitycollidefloor( int t )
 {
     if (!INBOUNDS_VEC(t, entities))
     {
-        puts("entitycollidefloor() out-of-bounds!");
+        vlog_error("entitycollidefloor() out-of-bounds!");
         return false;
     }
 
@@ -4387,7 +4404,7 @@ bool entityclass::entitycollideroof( int t )
 {
     if (!INBOUNDS_VEC(t, entities))
     {
-        puts("entitycollideroof() out-of-bounds!");
+        vlog_error("entitycollideroof() out-of-bounds!");
         return false;
     }
 
@@ -4405,7 +4422,7 @@ bool entityclass::testwallsx( int t, int tx, int ty, const bool skipdirblocks )
 {
     if (!INBOUNDS_VEC(t, entities))
     {
-        puts("testwallsx() out-of-bounds!");
+        vlog_error("testwallsx() out-of-bounds!");
         return false;
     }
 
@@ -4449,7 +4466,7 @@ bool entityclass::testwallsy( int t, float tx, float ty )
 {
     if (!INBOUNDS_VEC(t, entities))
     {
-        puts("testwallsy() out-of-bounds!");
+        vlog_error("testwallsy() out-of-bounds!");
         return false;
     }
 
@@ -4494,7 +4511,7 @@ void entityclass::applyfriction( int t, float xrate, float yrate )
 {
     if (!INBOUNDS_VEC(t, entities))
     {
-        puts("applyfriction() out-of-bounds!");
+        vlog_error("applyfriction() out-of-bounds!");
         return;
     }
 
@@ -4515,7 +4532,7 @@ void entityclass::updateentitylogic( int t )
 {
     if (!INBOUNDS_VEC(t, entities))
     {
-        puts("updateentitylogic() out-of-bounds!");
+        vlog_error("updateentitylogic() out-of-bounds!");
         return;
     }
 
@@ -4558,7 +4575,7 @@ void entityclass::entitymapcollision( int t )
 {
     if (!INBOUNDS_VEC(t, entities))
     {
-        puts("entitymapcollision() out-of-bounds!");
+        vlog_error("entitymapcollision() out-of-bounds!");
         return;
     }
 
@@ -4586,7 +4603,7 @@ void entityclass::movingplatformfix( int t, int j )
 {
     if (!INBOUNDS_VEC(t, entities) || !INBOUNDS_VEC(j, entities))
     {
-        puts("movingplatformfix() out-of-bounds!");
+        vlog_error("movingplatformfix() out-of-bounds!");
         return;
     }
 
@@ -4628,7 +4645,7 @@ void entityclass::movingplatformfix( int t, int j )
 void entityclass::customwarplinecheck(int i) {
     if (!INBOUNDS_VEC(i, entities))
     {
-        puts("customwarplinecheck() out-of-bounds!");
+        vlog_error("customwarplinecheck() out-of-bounds!");
         return;
     }
 
@@ -4728,7 +4745,7 @@ void entityclass::collisioncheck(int i, int j, bool scm /*= false*/)
 {
     if (!INBOUNDS_VEC(i, entities) || !INBOUNDS_VEC(j, entities))
     {
-        puts("collisioncheck() out-of-bounds!");
+        vlog_error("collisioncheck() out-of-bounds!");
         return;
     }
 
@@ -4862,7 +4879,7 @@ void entityclass::stuckprevention(int t)
 {
     if (!INBOUNDS_VEC(t, entities))
     {
-        puts("stuckprevention() out-of-bounds!");
+        vlog_error("stuckprevention() out-of-bounds!");
         return;
     }
 

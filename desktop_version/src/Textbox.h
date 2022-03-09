@@ -1,7 +1,6 @@
 #ifndef TEXTBOX_H
 #define TEXTBOX_H
 
-#include <SDL.h>
 #include <string>
 #include <vector>
 
@@ -18,8 +17,6 @@ public:
 
     void initcol(int rr, int gg, int bb);
 
-    void setcol(int rr, int gg, int bb);
-
     void update(void);
 
     void remove(void);
@@ -28,20 +25,17 @@ public:
 
     void resize(void);
 
-    void addline(std::string t);
+    void addline(const std::string& t);
 public:
     //Fundamentals
-    std::vector<std::string> line;
-    int xp, yp, lw, w, h;
+    std::vector<std::string> lines;
+    int xp, yp, w, h;
     int r,g,b;
-    int tr,tg,tb;
     int timer;
 
     float tl;
     float prev_tl;
     int tm;
-
-    int max;
 
     /* Whether to flip text box y-position in Flip Mode. */
     bool flipme;

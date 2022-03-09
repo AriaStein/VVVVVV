@@ -42,7 +42,7 @@ void VVV_fillstring(
     if (whine) \
     { \
         whine = false; \
-        puts(message); \
+        vlog_error(message); \
     } \
     do { } while (false)
 
@@ -68,16 +68,6 @@ void _VVV_between(
         sizeof(middle) \
     )
 
-#ifndef __has_attribute
-#   define __has_attribute(x) 0
-#endif
-
-#if __has_attribute(__fallthrough__)
-#   define VVV_fallthrough __attribute__((__fallthrough__))
-#else
-#   define VVV_fallthrough do { } while (false) /* fallthrough */
-#endif
-
 #define MAYBE_FAIL(expr) \
     do \
     { \
@@ -87,6 +77,11 @@ void _VVV_between(
         } \
     } \
     while (false)
+
+/* Positive modulo, because C/C++'s modulo operator sucks and is negative given
+ * negative divisors.
+ * WARNING! This double- and triple- evaluates. */
+#define POS_MOD(a, b) (((a) % (b) + (b)) % (b))
 
 //helperClass
 class UtilityClass
@@ -100,11 +95,13 @@ public:
 
     static std::string GCString(const std::vector<SDL_GameControllerButton>& buttons);
 
-    std::string twodigits(int t);
+    int hms_to_seconds(int h, int m, int s);
+
+    void format_time(char* buffer, const size_t buffer_size, int seconds, int frames, bool always_minutes);
 
     std::string timestring(int t);
 
-    std::string number(int _t);
+    std::string number_words(int _t);
 
 
     static bool intersects( SDL_Rect A, SDL_Rect B );
@@ -114,7 +111,6 @@ public:
     int glow;
     int slowsine;
     int glowdir;
-    int splitseconds[30];
 };
 
 #ifndef HELP_DEFINITION

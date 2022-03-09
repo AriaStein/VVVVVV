@@ -1,6 +1,7 @@
-#include "editor.h"
+#include "CustomLevels.h"
 #include "Game.h"
 #include "Graphics.h"
+#include "Editor.h"
 #include "Entity.h"
 #include "Enums.h"
 #include "Map.h"
@@ -118,7 +119,7 @@ void gamerenderfixed(void)
         map.glitchname = map.getglitchname(game.roomx, game.roomy);
     }
 
-#ifndef NO_CUSTOM_LEVELS
+#if !defined(NO_CUSTOM_LEVELS) && !defined(NO_EDITOR)
     ed.oldreturneditoralpha = ed.returneditoralpha;
     if (map.custommode && !map.custommodeforreal && ed.returneditoralpha > 0)
     {
@@ -205,13 +206,14 @@ void maprenderfixed(void)
         || !script.running)
         {
             graphics.menuoffset += 25;
-            int threshold = map.extrarow ? 230 : 240;
+            int threshold = 240;
             if (graphics.menuoffset >= threshold)
             {
                 graphics.menuoffset = threshold;
                 //go back to gamemode!
                 game.mapheld = true;
                 game.gamestate = GAMEMODE;
+                graphics.resumegamemode = false;
             }
         }
         else

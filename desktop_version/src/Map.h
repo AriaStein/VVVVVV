@@ -15,7 +15,7 @@
 struct Roomtext
 {
     int x, y;
-    std::string text;
+    const char* text;
 };
 
 class mapclass
@@ -35,7 +35,7 @@ public:
 
     void transformname(int t);
 
-    std::string getglitchname(int x, int y);
+    const char* getglitchname(int x, int y);
 
     void initmapdata(void);
     void initcustommapdata(void);
@@ -81,7 +81,9 @@ public:
 
     void gotoroom(int rx, int ry);
 
-    std::string currentarea(int t);
+    void spawncompanion(void);
+
+    const char* currentarea(int t);
 
     void loadlevel(int rx, int ry);
 
@@ -93,7 +95,6 @@ public:
     static const int areamap[20 * 20];
     int contents[40 * 30];
     bool explored[20 * 20];
-    int vmult[30];
 
     bool isexplored(const int rx, const int ry);
     void setexplored(const int rx, const int ry, const bool status);
@@ -105,8 +106,8 @@ public:
     bool warpy;
 
 
-    std::string roomname;
-    std::string hiddenname;
+    const char* roomname;
+    const char* hiddenname;
 
     //Special tower stuff
     bool towermode;
@@ -133,10 +134,10 @@ public:
     int customzoom;
     bool customshowmm;
 
-    std::string specialnames[8];
+    const char* specialnames[8];
     int glitchmode;
     int glitchdelay;
-    std::string glitchname;
+    const char* glitchname;
 
     //final level colour cycling stuff
     bool final_colormode;

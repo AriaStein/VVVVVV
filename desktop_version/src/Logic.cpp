@@ -543,7 +543,7 @@ void gamelogic(void)
         }
 
         //SWN Minigame Logic
-        if (game.swnmode)  	//which game?
+        if (game.swnmode)      //which game?
         {
             if(game.swngame==0)  //intermission, survive 60 seconds game
             {
@@ -994,7 +994,7 @@ void gamelogic(void)
                 obj.customwarpmodevon = false;
 
                 int i = obj.getplayer();
-                if (INBOUNDS_VEC(i, obj.entities) && ((game.door_down > -2 && obj.entities[i].yp >= 226-16) || (game.door_up > -2 && obj.entities[i].yp < -2+16) ||	(game.door_left > -2 && obj.entities[i].xp < -14+16) ||	(game.door_right > -2 && obj.entities[i].xp >= 308-16))){
+                if (INBOUNDS_VEC(i, obj.entities) && (obj.entities[i].yp >= 226-16 || obj.entities[i].yp < -2+16 || obj.entities[i].xp < -14+16 || obj.entities[i].xp >= 308-16)){
                     //Player is leaving room
                     obj.customwarplinecheck(i);
                 }
@@ -1134,12 +1134,12 @@ void gamelogic(void)
         {
             //Normal! Just change room
             int player = obj.getplayer();
-            if (INBOUNDS_VEC(player, obj.entities) && game.door_down > -2 && obj.entities[player].yp >= 238)
+            if (INBOUNDS_VEC(player, obj.entities) && obj.entities[player].yp >= 238)
             {
                 obj.entities[player].yp -= 240;
                 GOTOROOM(game.roomx, game.roomy + 1);
             }
-            if (INBOUNDS_VEC(player, obj.entities) && game.door_up > -2 && obj.entities[player].yp < -2)
+            if (INBOUNDS_VEC(player, obj.entities) && obj.entities[player].yp < -2)
             {
                 obj.entities[player].yp += 240;
                 GOTOROOM(game.roomx, game.roomy - 1);
@@ -1150,12 +1150,12 @@ void gamelogic(void)
         {
             //Normal! Just change room
             int player = obj.getplayer();
-            if (INBOUNDS_VEC(player, obj.entities) && game.door_left > -2 && obj.entities[player].xp < -14)
+            if (INBOUNDS_VEC(player, obj.entities) && obj.entities[player].xp < -14)
             {
                 obj.entities[player].xp += 320;
                 GOTOROOM(game.roomx - 1, game.roomy);
             }
-            if (INBOUNDS_VEC(player, obj.entities) && game.door_right > -2 && obj.entities[player].xp >= 308)
+            if (INBOUNDS_VEC(player, obj.entities) && obj.entities[player].xp >= 308)
             {
                 obj.entities[player].xp -= 320;
                 GOTOROOM(game.roomx + 1, game.roomy);
@@ -1169,12 +1169,12 @@ void gamelogic(void)
             {
                 //This is minitower 1!
                 int player = obj.getplayer();
-                if (INBOUNDS_VEC(player, obj.entities) && game.door_left > -2 && obj.entities[player].xp < -14)
+                if (INBOUNDS_VEC(player, obj.entities) && obj.entities[player].xp < -14)
                 {
                     obj.entities[player].xp += 320;
                     GOTOROOM(48, 52);
                 }
-                if (INBOUNDS_VEC(player, obj.entities) && game.door_right > -2 && obj.entities[player].xp >= 308)
+                if (INBOUNDS_VEC(player, obj.entities) && obj.entities[player].xp >= 308)
                 {
                     obj.entities[player].xp -= 320;
                     obj.entities[player].yp -= (71*8);
@@ -1185,7 +1185,7 @@ void gamelogic(void)
             {
                 //This is minitower 2!
                 int player = obj.getplayer();
-                if (INBOUNDS_VEC(player, obj.entities) && game.door_left > -2 && obj.entities[player].xp < -14)
+                if (INBOUNDS_VEC(player, obj.entities) && obj.entities[player].xp < -14)
                 {
                     if (obj.entities[player].yp > 300)
                     {
@@ -1199,7 +1199,7 @@ void gamelogic(void)
                         GOTOROOM(50, 53);
                     }
                 }
-                if (INBOUNDS_VEC(player, obj.entities) && game.door_right > -2 && obj.entities[player].xp >= 308)
+                if (INBOUNDS_VEC(player, obj.entities) && obj.entities[player].xp >= 308)
                 {
                     obj.entities[player].xp -= 320;
                     GOTOROOM(52, 53);
@@ -1229,13 +1229,13 @@ void gamelogic(void)
             {
                 //Do not wrap! Instead, go to the correct room
                 int player = obj.getplayer();
-                if (INBOUNDS_VEC(player, obj.entities) && game.door_left > -2 && obj.entities[player].xp < -14)
+                if (INBOUNDS_VEC(player, obj.entities) && obj.entities[player].xp < -14)
                 {
                     obj.entities[player].xp += 320;
                     obj.entities[player].yp -= (671 * 8);
                     GOTOROOM(108, 109);
                 }
-                if (INBOUNDS_VEC(player, obj.entities) && game.door_right > -2 && obj.entities[player].xp >= 308)
+                if (INBOUNDS_VEC(player, obj.entities) && obj.entities[player].xp >= 308)
                 {
                     obj.entities[player].xp -= 320;
                     GOTOROOM(110, 104);
@@ -1250,8 +1250,8 @@ void gamelogic(void)
                 int edi=obj.entities[game.edteleportent].behave;
                 int edj=obj.entities[game.edteleportent].para;
                 int edi2, edj2;
-                edi2 = (edi-(edi%40))/40;
-                edj2 = (edj-(edj%30))/30;
+                edi2 = edi/40;
+                edj2 = edj/30;
 
                 map.warpto(100+edi2, 100+edj2, obj.getplayer(), edi%40, (edj%30)+2);
                 game.teleport = false;
@@ -1405,203 +1405,6 @@ void gamelogic(void)
         }
     }
 
-    if (roomchange)
-    {
-        //We've changed room? Let's bring our companion along!
-        int i = obj.getplayer();
-        if (game.companion > 0 && INBOUNDS_VEC(i, obj.entities))
-        {
-            //ok, we'll presume our companion has been destroyed in the room change. So:
-            switch(game.companion)
-            {
-            case 6:
-            {
-                obj.createentity(obj.entities[i].xp, 121.0f, 15.0f,1);  //Y=121, the floor in that particular place!
-                int j = obj.getcompanion();
-                if (INBOUNDS_VEC(j, obj.entities))
-                {
-                    obj.entities[j].vx = obj.entities[i].vx;
-                    obj.entities[j].dir = obj.entities[i].dir;
-                }
-                break;
-            }
-            case 7:
-                if (game.roomy <= 105)   //don't jump after him!
-                {
-                    if (game.roomx == 110)
-                    {
-                        obj.createentity(320, 86, 16, 1);  //Y=86, the ROOF in that particular place!
-                    }
-                    else
-                    {
-                        obj.createentity(obj.entities[i].xp, 86.0f, 16.0f, 1);  //Y=86, the ROOF in that particular place!
-                    }
-                    int j = obj.getcompanion();
-                    if (INBOUNDS_VEC(j, obj.entities))
-                    {
-                        obj.entities[j].vx = obj.entities[i].vx;
-                        obj.entities[j].dir = obj.entities[i].dir;
-                    }
-                }
-                break;
-            case 8:
-                if (game.roomy >= 104)   //don't jump after him!
-                {
-                    if (game.roomx == 102)
-                    {
-                        obj.createentity(310, 177, 17, 1);
-                        int j = obj.getcompanion();
-                        if (INBOUNDS_VEC(j, obj.entities))
-                        {
-                            obj.entities[j].vx = obj.entities[i].vx;
-                            obj.entities[j].dir = obj.entities[i].dir;
-                        }
-                    }
-                    else
-                    {
-                        obj.createentity(obj.entities[i].xp, 177.0f, 17.0f, 1);
-                        int j = obj.getcompanion();
-                        if (INBOUNDS_VEC(j, obj.entities))
-                        {
-                            obj.entities[j].vx = obj.entities[i].vx;
-                            obj.entities[j].dir = obj.entities[i].dir;
-                        }
-                    }
-                }
-                break;
-            case 9:
-                if (!map.towermode)   //don't go back into the tower!
-                {
-                    if (game.roomx == 110 && obj.entities[i].xp<20)
-                    {
-                        obj.createentity(100, 185, 18, 15, 0, 1);
-                    }
-                    else
-                    {
-                        obj.createentity(obj.entities[i].xp, 185.0f, 18.0f, 15, 0, 1);
-                    }
-                    int j = obj.getcompanion();
-                    if (INBOUNDS_VEC(j, obj.entities))
-                    {
-                        obj.entities[j].vx = obj.entities[i].vx;
-                        obj.entities[j].dir = obj.entities[i].dir;
-                    }
-                }
-                break;
-            case 10:
-                //intermission 2, choose colour based on lastsaved
-                if (game.roomy == 51)
-                {
-                    if (!obj.flags[59])
-                    {
-                        obj.createentity(225.0f, 169.0f, 18, graphics.crewcolour(game.lastsaved), 0, 10);
-                        int j = obj.getcompanion();
-                        if (INBOUNDS_VEC(j, obj.entities))
-                        {
-                            obj.entities[j].vx = obj.entities[i].vx;
-                            obj.entities[j].dir = obj.entities[i].dir;
-                        }
-                    }
-                }
-                else	if (game.roomy >= 52)
-                {
-                    if (obj.flags[59])
-                    {
-                        obj.createentity(160.0f, 177.0f, 18, graphics.crewcolour(game.lastsaved), 0, 18, 1);
-                        int j = obj.getcompanion();
-                        if (INBOUNDS_VEC(j, obj.entities))
-                        {
-                            obj.entities[j].vx = obj.entities[i].vx;
-                            obj.entities[j].dir = obj.entities[i].dir;
-                        }
-                    }
-                    else
-                    {
-                        obj.flags[59] = true;
-                        obj.createentity(obj.entities[i].xp, -20.0f, 18.0f, graphics.crewcolour(game.lastsaved), 0, 10, 0);
-                        int j = obj.getcompanion();
-                        if (INBOUNDS_VEC(j, obj.entities))
-                        {
-                            obj.entities[j].vx = obj.entities[i].vx;
-                            obj.entities[j].dir = obj.entities[i].dir;
-                        }
-                    }
-                }
-                break;
-            case 11:
-                //Intermission 1: We're using the SuperCrewMate instead!
-                if(game.roomx-41==game.scmprogress)
-                {
-                    switch(game.scmprogress)
-                    {
-                    case 0:
-                        obj.createentity(76, 161, 24, graphics.crewcolour(game.lastsaved), 2);
-                        break;
-                    case 1:
-                        obj.createentity(10, 169, 24, graphics.crewcolour(game.lastsaved), 2);
-                        break;
-                    case 2:
-                        obj.createentity(10, 177, 24, graphics.crewcolour(game.lastsaved), 2);
-                        break;
-                    case 3:
-                        if (game.scmmoveme)
-                        {
-                            obj.createentity(obj.entities[obj.getplayer()].xp, 185, 24, graphics.crewcolour(game.lastsaved), 2);
-                            game.scmmoveme = false;
-                        }
-                        else
-                        {
-                            obj.createentity(10, 177, 24, graphics.crewcolour(game.lastsaved), 2);
-                        }
-                        break;
-                    case 4:
-                        obj.createentity(10, 185, 24, graphics.crewcolour(game.lastsaved), 2);
-                        break;
-                    case 5:
-                        obj.createentity(10, 185, 24, graphics.crewcolour(game.lastsaved), 2);
-                        break;
-                    case 6:
-                        obj.createentity(10, 185, 24, graphics.crewcolour(game.lastsaved), 2);
-                        break;
-                    case 7:
-                        obj.createentity(10, 41, 24, graphics.crewcolour(game.lastsaved), 2);
-                        break;
-                    case 8:
-                        obj.createentity(10, 169, 24, graphics.crewcolour(game.lastsaved), 2);
-                        break;
-                    case 9:
-                        obj.createentity(10, 169, 24, graphics.crewcolour(game.lastsaved), 2);
-                        break;
-                    case 10:
-                        obj.createentity(10, 129, 24, graphics.crewcolour(game.lastsaved), 2);
-                        break;
-                    case 11:
-                        obj.createentity(10, 129, 24, graphics.crewcolour(game.lastsaved), 2);
-                        break;
-                    case 12:
-                        obj.createentity(10, 65, 24, graphics.crewcolour(game.lastsaved), 2);
-                        break;
-                    case 13:
-                        obj.createentity(10, 177, 24, graphics.crewcolour(game.lastsaved));
-                        break;
-                    }
-                }
-
-                if (game.scmmoveme)
-                {
-                    int scm = obj.getscm();
-                    int player = obj.getplayer();
-                    if (INBOUNDS_VEC(scm, obj.entities) && INBOUNDS_VEC(player, obj.entities))
-                    {
-                        obj.entities[scm].xp = obj.entities[player].xp;
-                    }
-                    game.scmmoveme = false;
-                }
-                break;
-            }
-        }
-    }
-
     game.activeactivity = obj.checkactivity();
 
     if (game.hascontrol && !script.running
@@ -1611,6 +1414,8 @@ void gamelogic(void)
         game.activity_r = obj.blocks[game.activeactivity].r;
         game.activity_g = obj.blocks[game.activeactivity].g;
         game.activity_b = obj.blocks[game.activeactivity].b;
+        game.activity_x = obj.blocks[game.activeactivity].activity_x;
+        game.activity_y = obj.blocks[game.activeactivity].activity_y;
     }
 
     game.oldreadytotele = game.readytotele;

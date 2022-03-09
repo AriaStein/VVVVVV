@@ -166,16 +166,7 @@ SDL_Surface * ScaleSurface( SDL_Surface *_surface, int Width, int Height, SDL_Su
         _ret = Dest;
     }
 
-    float  _stretch_factor_x = (static_cast<double>(Width)  / static_cast<double>(_surface->w)), _stretch_factor_y = (static_cast<double>(Height) / static_cast<double>(_surface->h));
-
-
-    SDL_Rect gigantoPixel;
-    for(Sint32 y = 0; y < _surface->h; y++)
-        for(Sint32 x = 0; x < _surface->w; x++)
-        {
-            setRect(gigantoPixel, static_cast<Sint32>(float(x)*_stretch_factor_x), static_cast<Sint32>(float(y) *_stretch_factor_y), static_cast<Sint32>(_stretch_factor_x),static_cast<Sint32>( _stretch_factor_y)) ;
-            SDL_FillRect(_ret, &gigantoPixel, ReadPixel(_surface, x, y));
-        }
+    SDL_BlitScaled(_surface, NULL, _ret, NULL);
 
     return _ret;
 }
@@ -341,22 +332,26 @@ SDL_Surface* ApplyFilter( SDL_Surface* _src )
             Uint8 green = (pixel & _src->format->Gmask) >> 8;
             Uint8 blue = (pixel & _src->format->Bmask) >> 0;
 
-            Uint32 pixelOffset = ReadPixel(_src, VVV_min(x+redOffset, 319), sampley) ;
+            Uint32 pixelOffset = ReadPixel(_src, SDL_min(x+redOffset, 319), sampley) ;
             Uint8 red = (pixelOffset & _src->format->Rmask) >> 16 ;
 
+            double mult;
+            int tmp; /* needed to avoid char overflow */
             if(isscrolling && sampley > 220 && ((rand() %10) < 4))
             {
-                red = VVV_min(int(red+(fRandom() * 0.6)  * 254) , 255);
-                green = VVV_min(int(green+(fRandom() * 0.6)  * 254) , 255);
-                blue = VVV_min(int(blue+(fRandom() * 0.6)  * 254) , 255);
+                mult = 0.6;
             }
             else
             {
-                red = VVV_min(int(red+(fRandom() * 0.2)  * 254) , 255);
-                green = VVV_min(int(green+(fRandom() * 0.2)  * 254) , 255);
-                blue = VVV_min(int(blue+(fRandom() * 0.2)  * 254) , 255);
+                mult = 0.2;
             }
 
+            tmp = red + fRandom() * mult * 254;
+            red = SDL_min(tmp, 255);
+            tmp = green + fRandom() * mult * 254;
+            green = SDL_min(tmp, 255);
+            tmp = blue + fRandom() * mult * 254;
+            blue = SDL_min(tmp, 255);
 
             if(y % 2 == 0)
             {
@@ -368,9 +363,9 @@ SDL_Surface* ApplyFilter( SDL_Surface* _src )
             int distX =  static_cast<int>((SDL_abs (160.0f -x ) / 160.0f) *16);
             int distY =  static_cast<int>((SDL_abs (120.0f -y ) / 120.0f)*32);
 
-            red = VVV_max(red - ( distX +distY), 0);
-            green = VVV_max(green - ( distX +distY), 0);
-            blue = VVV_max(blue - ( distX +distY), 0);
+            red = SDL_max(red - ( distX +distY), 0);
+            green = SDL_max(green - ( distX +distY), 0);
+            blue = SDL_max(blue - ( distX +distY), 0);
 
             Uint32 finalPixel = ((red<<16) + (green<<8) + (blue<<0)) | (pixel &_src->format->Amask);
             DrawPixel(_ret,x,y,  finalPixel);

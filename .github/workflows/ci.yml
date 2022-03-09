@@ -62,7 +62,7 @@ jobs:
     name: Build (CentOS 7)
 
     runs-on: ubuntu-latest
-    container: ghcr.io/leo60228/vvvvvv-build@sha256:485448ad437653d47ceb068a0f2b910f4eb336107d340a1f0d828ca95c987985
+    container: ghcr.io/infoteddy/vvvvvv-build@sha256:edb1636c49386d0f929722cd0d8a618d897d23af33c754f2b0d3593ceb994629
 
     env:
       CXXFLAGS: -I/usr/local/include/SDL2
@@ -112,58 +112,91 @@ jobs:
 
     runs-on: windows-latest
 
+    env:
+      SDL_VERSION: 2.0.20
+      SDL_MIXER_VERSION: 2.0.4
+
     steps:
     - uses: actions/checkout@v1
 
-    - name: Install dependencies (Windows)
+    - name: Cache SDL
+      uses: actions/cache@v2
+      env:
+        cache-name: cache-sdl
+      with:
+        path: C:\SDL
+        key: ${{ runner.os }}-build-${{ env.cache-name }}
+
+    - name: Cache SDL_mixer
+      uses: actions/cache@v2
+      env:
+        cache-name: cache-sdl-mixer
+      with:
+        path: C:\SDL_mixer
+        key: ${{ runner.os }}-build-${{ env.cache-name }}
+
+    - name: Download SDL if not cached
       run: |
-        vcpkg install sdl2 sdl2-mixer
+        if (-Not (Test-Path C:\SDL))
+        {
+          Invoke-WebRequest "https://github.com/libsdl-org/SDL/releases/download/release-$env:SDL_VERSION/SDL2-devel-$env:SDL_VERSION-VC.zip" -o C:\SDL.zip
+          Expand-Archive C:\SDL.zip -DestinationPath C:\
+        }
+
+    - name: Download SDL_mixer if not cached
+      run: |
+        if (-Not (Test-Path C:\SDL_mixer))
+        {
+          Invoke-WebRequest "https://www.libsdl.org/projects/SDL_mixer/release/SDL2_mixer-devel-$env:SDL_MIXER_VERSION-VC.zip" -o C:\SDL_mixer.zip
+          Expand-Archive C:\SDL_mixer.zip -DestinationPath C:\
+        }
 
     - name: CMake configure (default version)
       run: |
-        cd $env:SRC_DIR_PATH
-        $env:LDFLAGS =  "/LIBPATH:$env:VCPKG_INSTALLATION_ROOT\installed\x86-windows\lib "
-        $env:LDFLAGS += "/LIBPATH:$env:VCPKG_INSTALLATION_ROOT\installed\x86-windows\lib\manual-link"
-        cmake -G "Visual Studio 16 2019" -A Win32 `
-              -DSDL2_INCLUDE_DIRS="$env:VCPKG_INSTALLATION_ROOT\installed\x86-windows\include\SDL2" `
-              -DSDL2_LIBRARIES="SDL2;SDL2main;SDL2_mixer" .
+        mkdir $env:SRC_DIR_PATH/build
+        cd $env:SRC_DIR_PATH/build
+        $env:LDFLAGS =  "/LIBPATH:C:\SDL2-$env:SDL_VERSION\lib\x86 "
+        $env:LDFLAGS += "/LIBPATH:C:\SDL2_mixer-$env:SDL_MIXER_VERSION\lib\x86"
+        cmake -G "Visual Studio 17 2022" -A Win32 `
+              -DSDL2_INCLUDE_DIRS="C:\SDL2-$env:SDL_VERSION\include;C:\SDL2_mixer-$env:SDL_MIXER_VERSION\include" `
+              -DSDL2_LIBRARIES="SDL2;SDL2main;SDL2_mixer" ..
     - name: Build (default version)
       run: |
-        cd $env:SRC_DIR_PATH
+        cd $env:SRC_DIR_PATH/build
         cmake --build .
 
     - name: CMake configure (official)
       run: |
-        cd $env:SRC_DIR_PATH
-        cmake -DOFFICIAL_BUILD=ON .
+        cd $env:SRC_DIR_PATH/build
+        cmake -DOFFICIAL_BUILD=ON ..
     - name: Build (official)
       run: |
-        cd $env:SRC_DIR_PATH
+        cd $env:SRC_DIR_PATH/build
         cmake --build .
 
     - name: CMake configure (M&P)
       run: |
-        cd $env:SRC_DIR_PATH
-        cmake -DOFFICIAL_BUILD=OFF -DMAKEANDPLAY=ON .
+        cd $env:SRC_DIR_PATH/build
+        cmake -DOFFICIAL_BUILD=OFF -DMAKEANDPLAY=ON ..
     - name: Build (M&P)
       run: |
-        cd $env:SRC_DIR_PATH
+        cd $env:SRC_DIR_PATH/build
         cmake --build .
 
     - name: CMake configure (no custom levels)
       run: |
-        cd $env:SRC_DIR_PATH
-        cmake -DMAKEANDPLAY=OFF -DCUSTOM_LEVEL_SUPPORT=DISABLED .
+        cd $env:SRC_DIR_PATH/build
+        cmake -DMAKEANDPLAY=OFF -DCUSTOM_LEVEL_SUPPORT=DISABLED ..
     - name: Build (no custom levels)
       run: |
-        cd $env:SRC_DIR_PATH
+        cd $env:SRC_DIR_PATH/build
         cmake --build .
 
     - name: CMake configure (no editor)
       run: |
-        cd $env:SRC_DIR_PATH
-        cmake -DCUSTOM_LEVEL_SUPPORT=NO_EDITOR .
+        cd $env:SRC_DIR_PATH/build
+        cmake -DCUSTOM_LEVEL_SUPPORT=NO_EDITOR ..
     - name: Build (no editor)
       run: |
-        cd $env:SRC_DIR_PATH
+        cd $env:SRC_DIR_PATH/build
         cmake --build .

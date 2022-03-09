@@ -1,7 +1,9 @@
 #include <SDL.h>
 
+#include "Constants.h"
 #include "Credits.h"
-#include "editor.h"
+#include "CustomLevels.h"
+#include "Editor.h"
 #include "Entity.h"
 #include "FileSystemUtils.h"
 #include "GlitchrunnerMode.h"
@@ -12,6 +14,7 @@
 #include "Map.h"
 #include "Maths.h"
 #include "Music.h"
+#include "Screen.h"
 #include "Script.h"
 #include "UtilityClass.h"
 #include "Version.h"
@@ -19,17 +22,6 @@
 static int tr;
 static int tg;
 static int tb;
-
-// Macro-like inline function used in maprender()
-// Used to keep some text positions the same in Flip Mode
-static int inline FLIP(int ypos)
-{
-    if (graphics.flipmode)
-    {
-        return 220 - ypos;
-    }
-    return ypos;
-}
 
 static inline void drawslowdowntext(void)
 {
@@ -86,7 +78,7 @@ static void volumesliderrender(void)
     num_positions = slider_length - symbol_length + 1;
 
     offset = num_positions * (*volume_ptr) / USER_VOLUME_MAX;
-    offset = clamp(offset, 0, slider_length - symbol_length);
+    offset = SDL_clamp(offset, 0, slider_length - symbol_length);
 
     /* SDL_strlcpy null-terminates, which would end the string in the middle of
      * it, which we don't want!
@@ -112,8 +104,7 @@ static void inline drawglitchrunnertext(void)
     int tempg = tg;
     int tempb = tb;
 
-    /* Screen width 40 chars, 4 per char */
-    char buffer[160 + 1];
+    char buffer[SCREEN_WIDTH_CHARS + 1];
 
     const char* mode_string;
 
@@ -168,22 +159,22 @@ static void menurender(void)
 #if !defined(NO_CUSTOM_LEVELS)
     case Menu::levellist:
     {
-      if(ed.ListOfMetaData.size()==0){
+      if(cl.ListOfMetaData.size()==0){
       graphics.Print( -1, 100, "ERROR: No levels found.", tr, tg, tb, true);
       }
       int tmp=game.currentmenuoption+(game.levelpage*8);
-      if(INBOUNDS_VEC(tmp, ed.ListOfMetaData)){
-        const bool nextlastoptions = ed.ListOfMetaData.size() > 8;
+      if(INBOUNDS_VEC(tmp, cl.ListOfMetaData)){
+        const bool nextlastoptions = cl.ListOfMetaData.size() > 8;
         //Don't show next/previous page or return to menu options here!
         if(nextlastoptions && game.menuoptions.size() - game.currentmenuoption<=3){
 
         }else{
-          graphics.bigprint( -1, 15, ed.ListOfMetaData[tmp].title, tr, tg, tb, true);
-          graphics.Print( -1, 40, "by " + ed.ListOfMetaData[tmp].creator, tr, tg, tb, true);
-          graphics.Print( -1, 50, ed.ListOfMetaData[tmp].website, tr, tg, tb, true);
-          graphics.Print( -1, 70, ed.ListOfMetaData[tmp].Desc1, tr, tg, tb, true);
-          graphics.Print( -1, 80, ed.ListOfMetaData[tmp].Desc2, tr, tg, tb, true);
-          graphics.Print( -1, 90, ed.ListOfMetaData[tmp].Desc3, tr, tg, tb, true);
+          graphics.bigprint( -1, 15, cl.ListOfMetaData[tmp].title, tr, tg, tb, true);
+          graphics.Print( -1, 40, "by " + cl.ListOfMetaData[tmp].creator, tr, tg, tb, true);
+          graphics.Print( -1, 50, cl.ListOfMetaData[tmp].website, tr, tg, tb, true);
+          graphics.Print( -1, 70, cl.ListOfMetaData[tmp].Desc1, tr, tg, tb, true);
+          graphics.Print( -1, 80, cl.ListOfMetaData[tmp].Desc2, tr, tg, tb, true);
+          graphics.Print( -1, 90, cl.ListOfMetaData[tmp].Desc3, tr, tg, tb, true);
         }
       }
       break;
@@ -298,19 +289,14 @@ static void menurender(void)
         }
         break;
     case Menu::graphicoptions:
-        if (graphics.screenbuffer == NULL)
+    {
+        int offset = 0;
+        if (game.currentmenuoption == offset + 0 && !gameScreen.isForcedFullscreen())
         {
-            SDL_assert(0 && "Screenbuffer is NULL!");
-            break;
-        }
-
-        switch (game.currentmenuoption)
-        {
-        case 0:
             graphics.bigprint( -1, 30, "Toggle Fullscreen", tr, tg, tb, true);
             graphics.Print( -1, 65, "Change to fullscreen/windowed mode.", tr, tg, tb, true);
 
-            if (graphics.screenbuffer->isWindowed)
+            if (gameScreen.isWindowed)
             {
                 graphics.Print( -1, 85, "Current mode: WINDOWED", tr, tg, tb, true);
             }
@@ -318,40 +304,53 @@ static void menurender(void)
             {
                 graphics.Print( -1, 85, "Current mode: FULLSCREEN", tr, tg, tb, true);
             }
-            break;
+        }
 
-        case 1:
+        if (gameScreen.isForcedFullscreen())
+        {
+            --offset;
+        }
+
+        if (game.currentmenuoption == offset + 1)
+        {
             graphics.bigprint( -1, 30, "Scaling Mode", tr, tg, tb, true);
             graphics.Print( -1, 65, "Choose letterbox/stretch/integer mode.", tr, tg, tb, true);
 
-            switch (graphics.screenbuffer->stretchMode)
+            switch (gameScreen.scalingMode)
             {
-            case 2:
+            case SCALING_INTEGER:
                 graphics.Print( -1, 85, "Current mode: INTEGER", tr, tg, tb, true);
                 break;
-            case 1:
+            case SCALING_STRETCH:
                 graphics.Print( -1, 85, "Current mode: STRETCH", tr, tg, tb, true);
                 break;
+            case SCALING_LETTERBOX:
             default:
                 graphics.Print( -1, 85, "Current mode: LETTERBOX", tr, tg, tb, true);
                 break;
             }
-            break;
-        case 2:
+        }
+        if (game.currentmenuoption == offset + 2 && !gameScreen.isForcedFullscreen())
+        {
             graphics.bigprint(-1, 30, "Resize to Nearest", tr, tg, tb, true);
             graphics.Print(-1, 65, "Resize to the nearest window size", tr, tg, tb, true);
             graphics.Print(-1, 75, "that is of an integer multiple.", tr, tg, tb, true);
-            if (!graphics.screenbuffer->isWindowed)
+            if (!gameScreen.isWindowed)
             {
                 graphics.Print(-1, 95, "You must be in windowed mode", tr, tg, tb, true);
                 graphics.Print(-1, 105, "to use this option.", tr, tg, tb, true);
             }
-            break;
-        case 3:
+        }
+        if (gameScreen.isForcedFullscreen())
+        {
+            --offset;
+        }
+        if (game.currentmenuoption == offset + 3)
+        {
             graphics.bigprint( -1, 30, "Toggle Filter", tr, tg, tb, true);
             graphics.Print( -1, 65, "Change to nearest/linear filter.", tr, tg, tb, true);
 
-            if (graphics.screenbuffer->isFiltered)
+            if (gameScreen.isFiltered)
             {
                 graphics.Print( -1, 85, "Current mode: LINEAR", tr, tg, tb, true);
             }
@@ -359,23 +358,21 @@ static void menurender(void)
             {
                 graphics.Print( -1, 85, "Current mode: NEAREST", tr, tg, tb, true);
             }
-            break;
+        }
 
-        case 4:
+        if (game.currentmenuoption == offset + 4)
+        {
             graphics.bigprint( -1, 30, "Analogue Mode", tr, tg, tb, true);
             graphics.Print( -1, 65, "There is nothing wrong with your", tr, tg, tb, true);
             graphics.Print( -1, 75, "television set. Do not attempt to", tr, tg, tb, true);
             graphics.Print( -1, 85, "adjust the picture.", tr, tg, tb, true);
-            break;
-        case 5:
+        }
+        if (game.currentmenuoption == offset + 5)
+        {
             graphics.bigprint(-1, 30, "Toggle VSync", tr, tg, tb, true);
-#ifdef __HAIKU__ // FIXME: Remove after SDL VSync bug is fixed! -flibit
-            graphics.Print(-1, 65, "Edit the config file on Haiku!", tr, tg, tb, true);
-#else
             graphics.Print(-1, 65, "Turn VSync on or off.", tr, tg, tb, true);
-#endif
 
-            if (!graphics.screenbuffer->vsync)
+            if (!gameScreen.vsync)
             {
                 graphics.Print(-1, 85, "Current mode: VSYNC OFF", tr/2, tg/2, tb/2, true);
             }
@@ -383,9 +380,9 @@ static void menurender(void)
             {
                 graphics.Print(-1, 85, "Current mode: VSYNC ON", tr, tg, tb, true);
             }
-            break;
         }
         break;
+    }
     case Menu::audiooptions:
         switch (game.currentmenuoption)
         {
@@ -405,8 +402,7 @@ static void menurender(void)
                 break;
             }
         {
-            /* Screen width 40 chars, 4 per char */
-            char buffer[160 + 1];
+            char buffer[SCREEN_WIDTH_CHARS + 1];
             char soundtrack[6 + 1];
             char letter;
             if (music.usingmmmmmm)
@@ -432,19 +428,20 @@ static void menurender(void)
         graphics.Print( -1, 50, "VVVVVV is a game by", tr, tg, tb, true);
         graphics.bigprint( 40, 65, "Terry Cavanagh", tr, tg, tb, true, 2);
 
-        graphics.drawimagecol(7, -1, 86, tr *0.75, tg *0.75, tb *0.75, true);
+        graphics.drawimagecol(7, -1, 86, true);
 
         graphics.Print( -1, 120, "and features music by", tr, tg, tb, true);
         graphics.bigprint( 40, 135, "Magnus P~lsson", tr, tg, tb, true, 2);
-        graphics.drawimagecol(8, -1, 156, tr *0.75, tg *0.75, tb *0.75, true);
+        graphics.drawimagecol(8, -1, 156, true);
         break;
     case Menu::credits2:
         graphics.Print( -1, 50, "Roomnames are by", tr, tg, tb, true);
         graphics.bigprint( 40, 65, "Bennett Foddy", tr, tg, tb, true);
-        graphics.drawimagecol(9, -1, 86, tr*0.75, tg *0.75, tb *0.75, true);
+        graphics.drawimagecol(9, -1, 86, true);
         graphics.Print( -1, 110, "C++ version by", tr, tg, tb, true);
         graphics.bigprint( 40, 125, "Simon Roth", tr, tg, tb, true);
         graphics.bigprint( 40, 145, "Ethan Lee", tr, tg, tb, true);
+        graphics.bigprint( 40, 165, "Misa Kai", tr, tg, tb, true);
         break;
     case Menu::credits25:
         graphics.Print( -1, 40, "Beta Testing by", tr, tg, tb, true);
@@ -459,7 +456,7 @@ static void menurender(void)
         graphics.Print( 40, 30, "the following patrons", tr, tg, tb, true);
 
         int startidx = game.current_credits_list_index;
-        int endidx = VVV_min(startidx + 9, (int)SDL_arraysize(Credits::superpatrons));
+        int endidx = SDL_min(startidx + 9, (int)SDL_arraysize(Credits::superpatrons));
 
         int xofs = 80 - 16;
         int yofs = 40 + 20;
@@ -477,7 +474,7 @@ static void menurender(void)
         graphics.Print( -1, 20, "and also by", tr, tg, tb, true);
 
         int startidx = game.current_credits_list_index;
-        int endidx = VVV_min(startidx + 14, (int)SDL_arraysize(Credits::patrons));
+        int endidx = SDL_min(startidx + 14, (int)SDL_arraysize(Credits::patrons));
 
         int maxheight = 10 * 14;
         int totalheight = (endidx - startidx) * 10;
@@ -498,7 +495,7 @@ static void menurender(void)
         graphics.Print( 40, 30, "GitHub from", tr, tg, tb, true);
 
         int startidx = game.current_credits_list_index;
-        int endidx = VVV_min(startidx + 9, (int)SDL_arraysize(Credits::githubfriends));
+        int endidx = SDL_min(startidx + 9, (int)SDL_arraysize(Credits::githubfriends));
 
         int maxheight = 14 * 9;
         int totalheight = (endidx - startidx) * 14;
@@ -506,19 +503,8 @@ static void menurender(void)
 
         int xofs, yofs;
 
-        if (startidx == 0)
-        {
-            graphics.Print(-1, 60, Credits::githubfriends[0], tr, tg, tb, true);
-            graphics.Print(-1, 80, Credits::githubfriends[2], tr, tg, tb, true);
-            startidx += 4; // Skip the superfriends now that we've drawn them...
-            xofs = 80 - 28;
-            yofs = 80 + 20 + (emptyspace / 2);
-        }
-        else
-        {
-            xofs = 80 - 16;
-            yofs = 40 + 20 + (emptyspace / 2);
-        }
+        xofs = 80 - 16;
+        yofs = 40 + 20 + (emptyspace / 2);
 
         for (int i = startidx; i < endidx; ++i)
         {
@@ -637,8 +623,7 @@ static void menurender(void)
             break;
         case 2:
         {
-            /* Screen width 40 chars, 4 per char */
-            char buffer[160 + 1];
+            char buffer[SCREEN_WIDTH_CHARS + 1];
             const char* button;
 
             graphics.bigprint(-1, 30, "Interact Button", tr, tg, tb, true);
@@ -893,7 +878,7 @@ static void menurender(void)
         case 0:
         {
             //Show teleporter save info
-            graphics.drawpixeltextbox(17, 65-20, 286, 90, 36,12, 65, 185, 207,0,4);
+            graphics.drawpixeltextbox(17, 65-20, 286, 90, 65, 185, 207);
 
             graphics.bigprint(-1, 20, "Tele Save", tr, tg, tb, true);
             graphics.Print(0, 80-20, game.tele_currentarea, 25, 255 - (help.glow / 2), 255 - (help.glow / 2), true);
@@ -902,7 +887,7 @@ static void menurender(void)
                 graphics.drawcrewman(169-(3*42)+(i*42), 95-20, i, game.tele_crewstats[i], true);
             }
             graphics.Print(59, 132-20, game.tele_gametime, 255 - (help.glow / 2), 255 - (help.glow / 2), 255 - (help.glow / 2));
-            const std::string& trinketcount = help.number(game.tele_trinkets);
+            const std::string& trinketcount = help.number_words(game.tele_trinkets);
             graphics.Print(262-graphics.len(trinketcount), 132-20, trinketcount, 255 - (help.glow / 2), 255 - (help.glow / 2), 255 - (help.glow / 2));
 
             graphics.drawsprite(34, 126-20, 50, graphics.col_clock);
@@ -912,7 +897,7 @@ static void menurender(void)
         case 1:
         {
             //Show quick save info
-            graphics.drawpixeltextbox(17, 65-20, 286, 90, 36,12, 65, 185, 207,0,4);
+            graphics.drawpixeltextbox(17, 65-20, 286, 90, 65, 185, 207);
 
             graphics.bigprint(-1, 20, "Quick Save", tr, tg, tb, true);
             graphics.Print(0, 80-20, game.quick_currentarea, 25, 255 - (help.glow / 2), 255 - (help.glow / 2), true);
@@ -921,7 +906,7 @@ static void menurender(void)
                 graphics.drawcrewman(169-(3*42)+(i*42), 95-20, i, game.quick_crewstats[i], true);
             }
             graphics.Print(59, 132-20, game.quick_gametime, 255 - (help.glow / 2), 255 - (help.glow / 2), 255 - (help.glow / 2));
-            const std::string& trinketcount = help.number(game.quick_trinkets);
+            const std::string& trinketcount = help.number_words(game.quick_trinkets);
             graphics.Print(262-graphics.len(trinketcount), 132-20, trinketcount, 255 - (help.glow / 2), 255 - (help.glow / 2), 255 - (help.glow / 2));
 
             graphics.drawsprite(34, 126-20, 50, graphics.col_clock);
@@ -940,10 +925,10 @@ static void menurender(void)
             graphics.drawcrewman(169-(3*42)+(i*42), 68, i, game.ndmresultcrewstats[i], true);
         }
         std::string tempstring;
-        tempstring = "You rescued " + help.number(game.ndmresultcrewrescued) + (game.ndmresultcrewrescued == 1 ? " crewmate" : " crewmates");
+        tempstring = "You rescued " + help.number_words(game.ndmresultcrewrescued) + (game.ndmresultcrewrescued == 1 ? " crewmate" : " crewmates");
         graphics.Print(0, 100, tempstring, tr, tg, tb, true);
 
-        tempstring = "and found " + help.number(game.ndmresulttrinkets) + (game.ndmresulttrinkets == 1 ? " trinket." : " trinkets.");
+        tempstring = "and found " + help.number_words(game.ndmresulttrinkets) + (game.ndmresulttrinkets == 1 ? " trinket." : " trinkets.");
         graphics.Print(0, 110, tempstring, tr, tg, tb, true);
 
         tempstring = "You managed to reach:";
@@ -987,7 +972,7 @@ static void menurender(void)
         std::string tempstring = "You rescued all the crewmates!";
         graphics.Print(0, 100, tempstring, tr, tg, tb, true);
 
-        tempstring = "And you found " + help.number(game.ndmresulttrinkets) + " trinkets.";
+        tempstring = "And you found " + help.number_words(game.ndmresulttrinkets) + " trinket" + (game.ndmresulttrinkets == 1 ? "" : "s") + ".";
         graphics.Print(0, 110, tempstring, tr, tg, tb, true);
 
         graphics.Print(0, 160, "A new trophy has been awarded and", tr, tg, tb, true);
@@ -1387,26 +1372,15 @@ static void menurender(void)
         graphics.Print( -1, 135, "the intermission levels.", tr, tg, tb, true);
         break;
     case Menu::playerworlds:
-    {
-        std::string tempstring = FILESYSTEM_getUserLevelDirectory();
-        if(tempstring.length()>80){
-            graphics.Print( -1, 160, "To install new player levels, copy", tr, tg, tb, true);
-            graphics.Print( -1, 170, "the .vvvvvv files to this folder:", tr, tg, tb, true);
-            graphics.Print( 320-((tempstring.length()-80)*8), 190, tempstring.substr(0,tempstring.length()-80), tr, tg, tb);
-            graphics.Print( 0, 200, tempstring.substr(tempstring.length()-80,40), tr, tg, tb);
-            graphics.Print( 0, 210, tempstring.substr(tempstring.length()-40,40), tr, tg, tb);
-        }else if(tempstring.length()>40){
-            graphics.Print( -1, 170, "To install new player levels, copy", tr, tg, tb, true);
-            graphics.Print( -1, 180, "the .vvvvvv files to this folder:", tr, tg, tb, true);
-            graphics.Print( 320-((tempstring.length()-40)*8), 200, tempstring.substr(0,tempstring.length()-40), tr, tg, tb);
-            graphics.Print( 0, 210, tempstring.substr(tempstring.length()-40,40), tr, tg, tb);
-        }else{
-            graphics.Print( -1, 180, "To install new player levels, copy", tr, tg, tb, true);
-            graphics.Print( -1, 190, "the .vvvvvv files to this folder:", tr, tg, tb, true);
-            graphics.Print( 320-(tempstring.length()*8), 210, tempstring, tr, tg, tb);
-        }
+        graphics.PrintWrap(-1, 180, "To install new player levels, copy the .vvvvvv files to the levels folder.", tr, tg, tb, true, 10, 304);
         break;
-    }
+    case Menu::confirmshowlevelspath:
+        graphics.PrintWrap(-1, 80, "Are you sure you want to show the levels path? This may reveal sensitive information if you are streaming.", tr, tg, tb, true, 10, 304);
+        break;
+    case Menu::showlevelspath:
+        graphics.Print(-1, 40, "The levels path is:", tr, tg, tb, true);
+        graphics.PrintWrap(0, 60, FILESYSTEM_getUserLevelDirectory(), tr, tg, tb, false, 10, 320);
+        break;
     case Menu::errorsavingsettings:
         graphics.Print( -1, 95, "ERROR: Could not save settings file!", tr, tg, tb, true);
         break;
@@ -1564,30 +1538,31 @@ void gamecompleterender(void)
         graphics.bigprint(60, 650 + position, "Bennett Foddy", tr, tg, tb);
     }
 
-    if (graphics.onscreen(680 + position))
+    if (graphics.onscreen(710 + position))
     {
         graphics.Print(40, 680 + position, "C++ Port by", tr, tg, tb);
         graphics.bigprint(60, 690 + position, "Simon Roth", tr, tg, tb);
         graphics.bigprint(60, 710 + position, "Ethan Lee", tr, tg, tb);
+        graphics.bigprint(60, 730 + position, "Misa Kai", tr, tg, tb);
     }
 
 
-    if (graphics.onscreen(740 + position))
+    if (graphics.onscreen(770 + position))
     {
-        graphics.Print(40, 740 + position, "Beta Testing by", tr, tg, tb);
-        graphics.bigprint(60, 750 + position, "Sam Kaplan", tr, tg, tb);
-        graphics.bigprint(60, 770 + position, "Pauli Kohberger", tr, tg, tb);
+        graphics.Print(40, 760 + position, "Beta Testing by", tr, tg, tb);
+        graphics.bigprint(60, 770 + position, "Sam Kaplan", tr, tg, tb);
+        graphics.bigprint(60, 790 + position, "Pauli Kohberger", tr, tg, tb);
     }
 
-    if (graphics.onscreen(800 + position))
+    if (graphics.onscreen(820 + position))
     {
-        graphics.Print(40, 800 + position, "Ending Picture by", tr, tg, tb);
-        graphics.bigprint(60, 810 + position, "Pauli Kohberger", tr, tg, tb);
+        graphics.Print(40, 820 + position, "Ending Picture by", tr, tg, tb);
+        graphics.bigprint(60, 830 + position, "Pauli Kohberger", tr, tg, tb);
     }
 
-    if (graphics.onscreen(890 + position)) graphics.bigprint( -1, 870 + position, "Patrons", tr, tg, tb, true, 3);
+    if (graphics.onscreen(910 + position)) graphics.bigprint( -1, 890 + position, "Patrons", tr, tg, tb, true, 3);
 
-    int creditOffset = 930;
+    int creditOffset = 950;
 
     for (size_t i = 0; i < SDL_arraysize(Credits::superpatrons); i += 1)
     {
@@ -1741,29 +1716,38 @@ void gamerender(void)
         }
     }
 
-    if (graphics.fademode==0 && !game.intimetrial && !game.isingamecompletescreen() && game.swngame != 1 && game.showingametimer)
+    if (graphics.fademode==0 && !game.intimetrial && !game.isingamecompletescreen() && (!game.swnmode || game.swngame != 1) && game.showingametimer)
     {
+        char buffer[SCREEN_WIDTH_CHARS + 1];
         graphics.bprint(6, 6, "TIME:",  255,255,255);
-        graphics.bprint(46, 6, game.timestring(),  196, 196, 196);
+        game.timestringcenti(buffer, sizeof(buffer));
+        graphics.bprint(46, 6, buffer,  196, 196, 196);
     }
 
-    if(map.extrarow==0 || (map.custommode && map.roomname!=""))
+    if(map.extrarow==0 || (map.custommode && map.roomname[0] != '\0'))
     {
+        const char* roomname;
+
         graphics.footerrect.y = 230;
+
+        if (map.finalmode)
+        {
+            roomname = map.glitchname;
+        }
+        else
+        {
+            roomname = map.roomname;
+        }
+
         if (graphics.translucentroomname)
         {
             SDL_BlitSurface(graphics.footerbuffer, NULL, graphics.backBuffer, &graphics.footerrect);
+            graphics.bprint(5, 231, roomname, 196, 196, 255 - help.glow, true);
         }
         else
         {
             FillRect(graphics.backBuffer, graphics.footerrect, 0);
-        }
-
-        if (map.finalmode)
-        {
-            graphics.bprint(5, 231, map.glitchname, 196, 196, 255 - help.glow, true);
-        }else{
-            graphics.bprint(5, 231, map.roomname, 196, 196, 255 - help.glow, true);
+            graphics.Print(5, 231, roomname, 196, 196, 255 - help.glow, true);
         }
     }
 
@@ -1776,7 +1760,7 @@ void gamerender(void)
         }
     }
 
-#if !defined(NO_CUSTOM_LEVELS)
+#if !defined(NO_CUSTOM_LEVELS) && !defined(NO_EDITOR)
      if(map.custommode && !map.custommodeforreal && !game.advancetext){
         //Return to level editor
         int alpha = graphics.lerp(ed.oldreturneditoralpha, ed.returneditoralpha);
@@ -1801,9 +1785,8 @@ void gamerender(void)
 
     if (game.readytotele > 100 || game.oldreadytotele > 100)
     {
-        /* Screen width 40 chars, 4 per char */
-        char buffer[160 + 1];
-        static const char raw[] = "- Press %s to Teleport - ";
+        char buffer[SCREEN_WIDTH_CHARS + 1];
+        static const char raw[] = "- Press %s to Teleport -";
         const char* final_string = interact_prompt(
             buffer,
             sizeof(buffer),
@@ -1920,7 +1903,7 @@ void gamerender(void)
                 graphics.bprint( 240, 190, "Best Time", 220 - (help.glow), 220 - (help.glow), 255 - (help.glow / 2), true);
                 graphics.bigbrprint( 300, 205, tempstring, 220 - (help.glow), 220 - (help.glow), 255 - (help.glow / 2), true, 2);
             }
-            else	if (int(game.swndelay / 10) % 2 == 1)
+            else    if (int(game.swndelay / 10) % 2 == 1)
             {
                 graphics.bigbprint( -1, 20, "SUPER GRAVITRON", 220 - (help.glow), 220 - (help.glow), 255 - (help.glow / 2), true, 2);
                 graphics.bigbprint( -1, 200, "GO!", 220 - (help.glow), 220 - (help.glow), 255 - (help.glow / 2), true, 3);
@@ -1952,6 +1935,9 @@ void gamerender(void)
         }
         else
         {
+            char buffer[SCREEN_WIDTH_CHARS + 1];
+            game.timestringcenti(buffer, sizeof(buffer));
+
             //Draw OSD stuff
             graphics.bprint(6, 18, "TIME :",  255,255,255);
             graphics.bprint(6, 30, "DEATH:",  255, 255, 255);
@@ -1959,11 +1945,11 @@ void gamerender(void)
 
             if(game.timetrialparlost)
             {
-                graphics.bprint(56, 18, game.timestring(),  196, 80, 80);
+                graphics.bprint(56, 18, buffer,  196, 80, 80);
             }
             else
             {
-                graphics.bprint(56, 18, game.timestring(),  196, 196, 196);
+                graphics.bprint(56, 18, buffer,  196, 196, 196);
             }
             if(game.deathcounts>0)
             {
@@ -1985,12 +1971,12 @@ void gamerender(void)
             if(game.timetrialparlost)
             {
                 graphics.bprint(195, 214, "PAR TIME:",  80, 80, 80);
-                graphics.bprint(275, 214, game.partimestring(),  80, 80, 80);
+                graphics.bprint(275, 214, game.timetstring(game.timetrialpar),  80, 80, 80);
             }
             else
             {
                 graphics.bprint(195, 214, "PAR TIME:",  255, 255, 255);
-                graphics.bprint(275, 214, game.partimestring(),  196, 196, 196);
+                graphics.bprint(275, 214, game.timetstring(game.timetrialpar),  196, 196, 196);
             }
         }
     }
@@ -1998,16 +1984,24 @@ void gamerender(void)
     float act_alpha = graphics.lerp(game.prev_act_fade, game.act_fade) / 10.0f;
     if(game.act_fade>5 || game.prev_act_fade>5)
     {
-        /* Screen width 40 chars, 4 per char */
-        char buffer[160 + 1];
+        char buffer[SCREEN_WIDTH_CHARS + 1];
         const char* final_string = interact_prompt(
             buffer,
             sizeof(buffer),
             game.activity_lastprompt.c_str()
         );
 
-        graphics.drawtextbox(16, 4, 36, 3, game.activity_r*act_alpha, game.activity_g*act_alpha, game.activity_b*act_alpha);
-        graphics.Print(5, 12, final_string, game.activity_r*act_alpha, game.activity_g*act_alpha, game.activity_b*act_alpha, true);
+        int centered_x = ((160 ) - ((graphics.len(final_string)) / 2));
+
+        if (game.activity_r == 0 && game.activity_g == 0 && game.activity_b == 0)
+        {
+            graphics.bprint(centered_x + game.activity_x, game.activity_y + 12, final_string, 196*act_alpha, 196*act_alpha, (255 - help.glow)*act_alpha);
+        }
+        else
+        {
+            graphics.drawtextbox(game.activity_x + 16, game.activity_y + 4, 36, 3, game.activity_r*act_alpha, game.activity_g*act_alpha, game.activity_b*act_alpha);
+            graphics.Print(centered_x + game.activity_x, game.activity_y + 12, final_string, game.activity_r*act_alpha, game.activity_g*act_alpha, game.activity_b*act_alpha);
+        }
     }
 
     if (obj.trophytext > 0 || obj.oldtrophytext > 0)
@@ -2019,13 +2013,17 @@ void gamerender(void)
     graphics.renderwithscreeneffects();
 }
 
+/* Used to keep some graphics positions on the map screen
+ * the same in Flip Mode. */
+#define FLIP(y, h) (graphics.flipmode ? 220 - (y) - (h) : (y))
+
 void maprender(void)
 {
     ClearSurface(graphics.backBuffer);
 
     //draw screen alliteration
     //Roomname:
-    if (map.hiddenname != "")
+    if (map.hiddenname[0] != '\0')
     {
         graphics.Print(5, 2, map.hiddenname, 196, 196, 255 - help.glow, true);
     }
@@ -2103,7 +2101,7 @@ void maprender(void)
         if (map.finalmode || (map.custommode&&!map.customshowmm))
         {
             //draw the map image
-            graphics.drawpixeltextbox(35, 16, 250, 190, 32,24, 65, 185, 207,4,0);
+            graphics.drawpixeltextbox(35, 16, 250, 190, 65, 185, 207);
             graphics.drawimage(1, 40, 21, false);
             for (int j = 0; j < 20; j++)
             {
@@ -2112,13 +2110,13 @@ void maprender(void)
                     graphics.drawimage(2, 40 + (i * 12), 21 + (j * 9), false);
                 }
             }
-            graphics.Print(-1, 105, "NO SIGNAL", 245, 245, 245, true);
+            graphics.bprint(-1, 105, "NO SIGNAL", 245, 245, 245, true);
         }
 #ifndef NO_CUSTOM_LEVELS
         else if(map.custommode)
         {
           //draw the map image
-          graphics.drawcustompixeltextbox(35+map.custommmxoff, 16+map.custommmyoff, map.custommmxsize+10, map.custommmysize+10, (map.custommmxsize+10)/8, (map.custommmysize+10)/8, 65, 185, 207,4,0);
+          graphics.drawpixeltextbox(35+map.custommmxoff, 16+map.custommmyoff, map.custommmxsize+10, map.custommmysize+10, 65, 185, 207);
           if (graphics.minimap_mounted)
           {
             graphics.drawpartimage(1, 40+map.custommmxoff, 21+map.custommmyoff, map.custommmxsize, map.custommmysize);
@@ -2235,7 +2233,7 @@ void maprender(void)
         else
         {
             //draw the map image
-            graphics.drawpixeltextbox(35, 16, 250, 190, 32,24, 65, 185, 207,4,0);
+            graphics.drawpixeltextbox(35, 16, 250, 190, 65, 185, 207);
             graphics.drawimage(1, 40, 21, false);
 
             //black out areas we can't see yet
@@ -2315,7 +2313,7 @@ void maprender(void)
                     {
                         int temp = 1086;
                         if (graphics.flipmode) temp += 3;
-                        graphics.drawtile(40 + 3 + (map.shinytrinkets[i].x * 12), 22 + (map.shinytrinkets[i].y * 9),	temp);
+                        graphics.drawtile(40 + 3 + (map.shinytrinkets[i].x * 12), 22 + (map.shinytrinkets[i].y * 9),    temp);
                     }
                 }
             }
@@ -2397,21 +2395,21 @@ void maprender(void)
         }
 #if !defined(NO_CUSTOM_LEVELS)
         else if(map.custommode){
-            LevelMetaData& meta = ed.ListOfMetaData[game.playcustomlevel];
+            LevelMetaData& meta = cl.ListOfMetaData[game.playcustomlevel];
 
-            graphics.bigprint( -1, FLIP(45), meta.title, 196, 196, 255 - help.glow, true);
-            graphics.Print( -1, FLIP(70), "by " + meta.creator, 196, 196, 255 - help.glow, true);
-            graphics.Print( -1, FLIP(80), meta.website, 196, 196, 255 - help.glow, true);
-            graphics.Print( -1, FLIP(100), meta.Desc1, 196, 196, 255 - help.glow, true);
-            graphics.Print( -1, FLIP(110), meta.Desc2, 196, 196, 255 - help.glow, true);
-            graphics.Print( -1, FLIP(120), meta.Desc3, 196, 196, 255 - help.glow, true);
+            graphics.bigprint(-1, FLIP(45, 8), meta.title, 196, 196, 255 - help.glow, true);
+            graphics.Print(-1, FLIP(70, 8), "by " + meta.creator, 196, 196, 255 - help.glow, true);
+            graphics.Print(-1, FLIP(80, 8), meta.website, 196, 196, 255 - help.glow, true);
+            graphics.Print(-1, FLIP(100, 8), meta.Desc1, 196, 196, 255 - help.glow, true);
+            graphics.Print(-1, FLIP(110, 8), meta.Desc2, 196, 196, 255 - help.glow, true);
+            graphics.Print(-1, FLIP(120, 8), meta.Desc3, 196, 196, 255 - help.glow, true);
 
-            int remaining = ed.numcrewmates() - game.crewmates();
+            int remaining = cl.numcrewmates() - game.crewmates();
 
             if(remaining==1){
-                graphics.Print(1,FLIP(165), help.number(remaining)+ " crewmate remains", 196, 196, 255 - help.glow, true);
+                graphics.Print(1, FLIP(165, 8), help.number_words(remaining) + " crewmate remains", 196, 196, 255 - help.glow, true);
             }else if(remaining>0){
-                graphics.Print(1,FLIP(165), help.number(remaining)+ " crewmates remain", 196, 196, 255 - help.glow, true);
+                graphics.Print(1, FLIP(165, 8), help.number_words(remaining) + " crewmates remain", 196, 196, 255 - help.glow, true);
             }
         }
 #endif
@@ -2478,182 +2476,110 @@ void maprender(void)
         }
         break;
     case 2:
-#if !defined(NO_CUSTOM_LEVELS)
-        if(map.custommode)
+    {
+        int total;
+#ifndef NO_CUSTOM_LEVELS
+        if (map.custommode)
         {
-          if (graphics.flipmode)
-          {
-              graphics.Print(0, 164, "[Trinkets found]", 196, 196, 255 - help.glow, true);
-              graphics.Print(0, 152, help.number(game.trinkets()) + " out of " + help.number(ed.numtrinkets()), 96,96,96, true);
-
-              graphics.Print(0, 114, "[Number of Deaths]", 196, 196, 255 - help.glow, true);
-              graphics.Print(0, 102,help.String(game.deathcounts),  96,96,96, true);
-
-              graphics.Print(0, 64, "[Time Taken]", 196, 196, 255 - help.glow, true);
-              graphics.Print(0, 52, game.timestring(),  96, 96, 96, true);
-          }
-          else
-          {
-              graphics.Print(0, 52, "[Trinkets found]", 196, 196, 255 - help.glow, true);
-              graphics.Print(0, 64, help.number(game.trinkets()) + " out of "+help.number(ed.numtrinkets()), 96,96,96, true);
-
-              graphics.Print(0, 102, "[Number of Deaths]", 196, 196, 255 - help.glow, true);
-              graphics.Print(0, 114,help.String(game.deathcounts),  96,96,96, true);
-
-              graphics.Print(0, 152, "[Time Taken]", 196, 196, 255 - help.glow, true);
-              graphics.Print(0, 164, game.timestring(),  96, 96, 96, true);
-          }
+            total = cl.numtrinkets();
         }
         else
 #endif
         {
-          if (graphics.flipmode)
-          {
-              graphics.Print(0, 164, "[Trinkets found]", 196, 196, 255 - help.glow, true);
-              graphics.Print(0, 152, help.number(game.trinkets()) + " out of Twenty", 96,96,96, true);
-
-              graphics.Print(0, 114, "[Number of Deaths]", 196, 196, 255 - help.glow, true);
-              graphics.Print(0, 102,help.String(game.deathcounts),  96,96,96, true);
-
-              graphics.Print(0, 64, "[Time Taken]", 196, 196, 255 - help.glow, true);
-              graphics.Print(0, 52, game.timestring(),  96, 96, 96, true);
-          }
-          else
-          {
-              graphics.Print(0, 52, "[Trinkets found]", 196, 196, 255 - help.glow, true);
-              graphics.Print(0, 64, help.number(game.trinkets()) + " out of Twenty", 96,96,96, true);
-
-              graphics.Print(0, 102, "[Number of Deaths]", 196, 196, 255 - help.glow, true);
-              graphics.Print(0, 114,help.String(game.deathcounts),  96,96,96, true);
-
-              graphics.Print(0, 152, "[Time Taken]", 196, 196, 255 - help.glow, true);
-              graphics.Print(0, 164, game.timestring(),  96, 96, 96, true);
-          }
+            total = 20;
         }
+
+        /* Stats. */
+        graphics.Print(0, FLIP(52, 8), "[Trinkets found]", 196, 196, 255 - help.glow, true);
+        graphics.Print(0, FLIP(64, 8), help.number_words(game.trinkets()) + " out of " + help.number_words(total), 96, 96, 96, true);
+
+        graphics.Print(0, FLIP(102, 8), "[Number of Deaths]", 196, 196, 255 - help.glow, true);
+        graphics.Print(0, FLIP(114, 8), help.String(game.deathcounts), 96, 96, 96, true);
+
+        graphics.Print(0, FLIP(152, 8), "[Time Taken]", 196, 196, 255 - help.glow, true);
+        graphics.Print(0, FLIP(164, 8), game.timestring(), 96, 96, 96, true);
         break;
+    }
     case 3:
+    {
         if (game.inintermission)
         {
             graphics.Print(0, 115, "Cannot Save in Level Replay", 146, 146, 180, true);
+            break;
         }
-        else if (game.nodeathmode)
+        if (game.nodeathmode)
         {
             graphics.Print(0, 115, "Cannot Save in No Death Mode", 146, 146, 180, true);
+            break;
         }
-        else if (game.intimetrial)
+        if (game.intimetrial)
         {
-            graphics.Print(0, 115, "Cannot Save in Time Trial", 146, 146, 180, true);
+            graphics.Print(0, 115, "How'd you get here?", 146, 146, 180, true);
+            break;
         }
-        else if (game.insecretlab)
+        if (game.insecretlab)
         {
             graphics.Print(0, 115, "Cannot Save in Secret Lab", 146, 146, 180, true);
+            break;
         }
-        else if (game.gamesavefailed)
+        if (game.gamesavefailed)
         {
             graphics.Print(0, 115, "ERROR: Could not save game!", 146, 146, 180, true);
+            break;
         }
-        else if (map.custommode)
+
+        /* We are not in a special case, so draw the save screen now... */
+
+        if (!map.custommode)
         {
-            if (game.gamesaved)
+            /* FIXME: The text here should be automatically "balance-wrapped" instead of hardcoding the width. */
+            graphics.PrintWrap(0, 174, "(Note: The game is autosaved at every teleporter.)", 146, 146, 180, true, 12, 240);
+        }
+
+        if (!game.gamesaved)
+        {
+            graphics.Print(0, 80, "[Press ACTION to save your game]", 255 - help.glow*2, 255 - help.glow*2, 255 - help.glow, true);
+
+            if (map.custommode || game.quicksummary == "")
             {
-                graphics.Print(0, 36, "Game saved ok!", 255 - (help.glow / 2), 255 - (help.glow / 2), 255 - (help.glow / 2), true);
-
-                graphics.drawpixeltextbox(17, 65, 286, 90, 36,12, 65, 185, 207,0,4);
-
-                if (graphics.flipmode)
-                {
-                    graphics.Print(0, 122, game.customleveltitle, 25, 255 - (help.glow / 2), 255 - (help.glow / 2), true);
-                    graphics.Print(59, 78, game.savetime, 255 - (help.glow / 2), 255 - (help.glow / 2), 255 - (help.glow / 2));
-                    const std::string& trinketcount = help.number(game.savetrinkets);
-                    graphics.Print(262-graphics.len(trinketcount), 78, trinketcount, 255 - (help.glow / 2), 255 - (help.glow / 2), 255 - (help.glow / 2));
-
-                    graphics.drawsprite(34, 74, 50, graphics.col_clock);
-                    graphics.drawsprite(270, 74, 22, graphics.col_trinket);
-                }
-                else
-                {
-                    graphics.Print(0, 90, game.customleveltitle, 25, 255 - (help.glow / 2), 255 - (help.glow / 2), true);
-                    graphics.Print(59, 132, game.savetime, 255 - (help.glow / 2), 255 - (help.glow / 2), 255 - (help.glow / 2));
-                    const std::string& trinketcount = help.number(game.savetrinkets);
-                    graphics.Print(262-graphics.len(trinketcount), 132, trinketcount, 255 - (help.glow / 2), 255 - (help.glow / 2), 255 - (help.glow / 2));
-
-                    graphics.drawsprite(34, 126, 50, graphics.col_clock);
-                    graphics.drawsprite(270, 126, 22, graphics.col_trinket);
-                }
+                break;
             }
-            else
-            {
-                graphics.Print(0, 80, "[Press ACTION to save your game]", 255 - (help.glow * 2), 255 - (help.glow * 2), 255 - help.glow, true);
-            }
+
+            graphics.Print(0, FLIP(100, 8), "Last Save:", 164 - help.glow/4, 164 - help.glow/4, 164, true);
+            graphics.Print(0, FLIP(110, 8), game.quicksummary, 164 - help.glow/4, 164 - help.glow/4, 164, true);
+            break;
+        }
+
+        /* We are only still here if the game has been quicksaved... */
+
+        graphics.Print(0, 36, "Game saved ok!", 255 - help.glow/2, 255 - help.glow/2, 255 - help.glow/2, true);
+
+        graphics.drawpixeltextbox(17, 65, 286, 90, 65, 185, 207);
+
+        if (map.custommode)
+        {
+            graphics.Print(0, FLIP(90, 8), game.customleveltitle, 25, 255 - help.glow/2, 255 - help.glow/2, true);
         }
         else
         {
-            if (graphics.flipmode)
+            size_t i;
+            graphics.Print(0, FLIP(80, 8), game.savearea, 25, 255 - help.glow/2, 255 - help.glow/2, true);
+            for (i = 0; i < SDL_arraysize(game.crewstats); ++i)
             {
-                graphics.Print(0, 186, "(Note: The game is autosaved", 146, 146, 180, true);
-                graphics.Print(0, 174, "at every teleporter.)", 146, 146, 180, true);
-            }
-            else
-            {
-                graphics.Print(0, 174, "(Note: The game is autosaved", 146, 146, 180, true);
-                graphics.Print(0, 186, "at every teleporter.)", 146, 146, 180, true);
-            }
-
-            if (game.gamesaved)
-            {
-                graphics.Print(0, 36, "Game saved ok!", 255 - (help.glow / 2), 255 - (help.glow / 2), 255 - (help.glow / 2), true);
-
-                graphics.drawpixeltextbox(17, 65, 286, 90, 36,12, 65, 185, 207,0,4);
-
-                if (graphics.flipmode)
-                {
-                    graphics.Print(0, 132, game.savearea, 25, 255 - (help.glow / 2), 255 - (help.glow / 2), true);
-                    for (int i = 0; i < 6; i++)
-                    {
-                        graphics.drawcrewman(169-(3*42)+(i*42), 98, i, game.crewstats[i], true);
-                    }
-                    graphics.Print(59, 78, game.savetime, 255 - (help.glow / 2), 255 - (help.glow / 2), 255 - (help.glow / 2));
-                    const std::string& trinketcount = help.number(game.savetrinkets);
-                    graphics.Print(262-graphics.len(trinketcount), 78, trinketcount, 255 - (help.glow / 2), 255 - (help.glow / 2), 255 - (help.glow / 2));
-
-                    graphics.drawsprite(34, 74, 50, graphics.col_clock);
-                    graphics.drawsprite(270, 74, 22, graphics.col_trinket);
-                }
-                else
-                {
-                    graphics.Print(0, 80, game.savearea, 25, 255 - (help.glow / 2), 255 - (help.glow / 2), true);
-                    for (int i = 0; i < 6; i++)
-                    {
-                        graphics.drawcrewman(169-(3*42)+(i*42), 95, i, game.crewstats[i], true);
-                    }
-                    graphics.Print(59, 132, game.savetime, 255 - (help.glow / 2), 255 - (help.glow / 2), 255 - (help.glow / 2));
-                    const std::string& trinketcount = help.number(game.savetrinkets);
-                    graphics.Print(262-graphics.len(trinketcount), 132, trinketcount, 255 - (help.glow / 2), 255 - (help.glow / 2), 255 - (help.glow / 2));
-
-                    graphics.drawsprite(34, 126, 50, graphics.col_clock);
-                    graphics.drawsprite(270, 126, 22, graphics.col_trinket);
-                }
-            }
-            else
-            {
-                graphics.Print(0, 80, "[Press ACTION to save your game]", 255 - (help.glow * 2), 255 - (help.glow * 2), 255 - help.glow, true);
-
-                if (game.quicksummary != "")
-                {
-                    if (graphics.flipmode)
-                    {
-                        graphics.Print(0, 110, "Last Save:", 164 - (help.glow / 4), 164 - (help.glow / 4), 164, true);
-                        graphics.Print(0, 100, game.quicksummary, 164  - (help.glow / 4), 164 - (help.glow / 4), 164, true);
-                    }
-                    else
-                    {
-                        graphics.Print(0, 100, "Last Save:", 164 - (help.glow / 4), 164 - (help.glow / 4), 164, true);
-                        graphics.Print(0, 110, game.quicksummary, 164  - (help.glow / 4), 164 - (help.glow / 4), 164, true);
-                    }
-                }
+                /* Crewmates are annoying. Their height is 21 pixels, but to flip them,
+                 * we also have to account for their 2-pixel y-offset (and multiply it by 2). */
+                graphics.drawcrewman(169 - 3*42 + i*42, FLIP(95, 21 + 2*2), i, game.crewstats[i], true);
             }
         }
+
+        graphics.Print(59, FLIP(132, 8), game.savetime, 255 - help.glow/2, 255 - help.glow/2, 255 - help.glow/2);
+        const std::string& trinketcount = help.number_words(game.savetrinkets);
+        graphics.Print(262 - graphics.len(trinketcount), FLIP(132, 8), trinketcount, 255 - help.glow/2, 255 - help.glow/2, 255 - help.glow/2);
+
+        graphics.drawsprite(34, FLIP(126, 17), 50, graphics.col_clock);
+        graphics.drawsprite(270, FLIP(126, 17), 22, graphics.col_trinket);
         break;
+    }
     case 10:
         graphics.Print(128, 220, "[ QUIT ]", 196, 196, 255 - help.glow);
 
@@ -2788,6 +2714,8 @@ void maprender(void)
     }
 }
 
+#undef FLIP
+
 void teleporterrender(void)
 {
     ClearSurface(graphics.backBuffer);
@@ -2809,7 +2737,7 @@ void teleporterrender(void)
     FillRect(graphics.backBuffer, 0, 12, 320, 240, 10, 24, 26);
 
     //draw the map image
-    graphics.drawpixeltextbox(35, 16, 250, 190, 32,24, 65, 185, 207,4,0);
+    graphics.drawpixeltextbox(35, 16, 250, 190, 65, 185, 207);
     graphics.drawimage(1, 40, 21, false);
     //black out areas we can't see yet
     for (int j = 0; j < 20; j++)
@@ -2870,7 +2798,7 @@ void teleporterrender(void)
             {
                 temp = 1086;
                 if (graphics.flipmode) temp += 3;
-                graphics.drawtile(40 + 3 + (map.shinytrinkets[i].x * 12), 22 + (map.shinytrinkets[i].y * 9),	temp);
+                graphics.drawtile(40 + 3 + (map.shinytrinkets[i].x * 12), 22 + (map.shinytrinkets[i].y * 9),    temp);
             }
         }
     }
@@ -2890,8 +2818,7 @@ void teleporterrender(void)
 
     if (game.useteleporter)
     {
-        /* Screen width 40 chars, 4 per char */
-        char buffer[160 + 1];
+        char buffer[SCREEN_WIDTH_CHARS + 1];
         static const char raw[] = "Press %s to Teleport";
         const char* final_string = interact_prompt(
             buffer,
